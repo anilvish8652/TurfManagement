@@ -53,7 +53,7 @@ export default function LoginPage() {
       console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
       const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
       const requestHeaders = {
-        'accept': 'text/plain',
+        'accept': 'text/plain', // API example showed this, though response is JSON
         'Content-Type': 'application/json',
       };
       console.log("API Endpoint:", apiEndpoint);
@@ -88,7 +88,9 @@ export default function LoginPage() {
       } else {
         let errorBody = "Could not read error body.";
         try {
+            // Try to read as text first, as error responses might not always be JSON
             errorBody = await response.text(); 
+            // If you expect JSON even for errors, you could try response.json() in another try-catch
         } catch (e) {
             console.error("Failed to read error body as text:", e);
         }
@@ -101,6 +103,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Full error object during fetch:", error); 
+      // Provide a more user-friendly message that hints at common issues
       const message = error instanceof Error ? error.message : "An unexpected error occurred during login.";
       toast({
         title: "Error",
