@@ -50,23 +50,29 @@ export default function LoginPage() {
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
     try {
-      const response = await fetch('https://api.classic7turf.com/Auth/Login', {
+      console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+      const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
+      const requestHeaders = {
+        'accept': 'text/plain',
+        'Content-Type': 'application/json',
+      };
+      console.log("API Endpoint:", apiEndpoint);
+      console.log("Request Headers:", requestHeaders);
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
-        headers: {
-          'accept': 'text/plain', // API example showed this, though response is JSON
-          'Content-Type': 'application/json',
-        },
+        headers: requestHeaders,
         body: JSON.stringify({ username: data.username, password: data.password }),
       });
 
+      console.log("Fetch response status:", response.status);
+      console.log("Fetch response ok:", response.ok);
+
       if (response.ok) {
         const result = await response.json();
+        console.log("API Login Result:", result);
         if (result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
-          // Optionally store other details from response if needed
-          // localStorage.setItem('tokenValidity', result.validity);
-          // localStorage.setItem('apiExpiringOn', result.apiExpiringOn);
-          
           toast({
             title: "Login Successful",
             description: "Welcome back!",
@@ -80,24 +86,21 @@ export default function LoginPage() {
           });
         }
       } else {
-        // Handle non-OK responses (e.g., 400, 401, 500)
-        let errorMessage = `Login failed. Status: ${response.status}`;
+        let errorBody = "Could not read error body.";
         try {
-            const errorData = await response.json(); // Try to parse error response as JSON
-            errorMessage = errorData.message || errorData.title || errorMessage;
+            errorBody = await response.text(); 
         } catch (e) {
-            // If response is not JSON, use text
-            const textError = await response.text();
-            errorMessage = textError || `Server responded with ${response.status}.`;
+            console.error("Failed to read error body as text:", e);
         }
+        console.error("Login API responded with an error:", response.status, errorBody);
         toast({
           title: "Login Failed",
-          description: errorMessage,
+          description: `Server responded with ${response.status}. ${errorBody}`,
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Login API call failed:", error); // This console.error will show up in browser console
+      console.error("Full error object during fetch:", error); 
       const message = error instanceof Error ? error.message : "An unexpected error occurred during login.";
       toast({
         title: "Error",
