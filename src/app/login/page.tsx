@@ -31,7 +31,7 @@ import { useState } from "react";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  password: z.string().min(1, { message: "Password is required." }), // Min 1 for simplicity, adjust as needed
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -50,37 +50,56 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Login submitted:", data);
+    console.log("Login submitted with:", data);
 
-    // ** 여기가 API를 호출할 위치입니다. **
-    // 아래는 API 호출의 예시입니다 (주석 처리됨).
-    // 실제 API 엔드포인트와 요청 본문으로 교체해야 합니다.
-    /*
     try {
-      const response = await fetch('/api/your-dotnet-login-endpoint', { // 실제 엔드포인트로 교체
+      const response = await fetch('https://api.classic7turf.com/Auth/Login', {
         method: 'POST',
         headers: {
+          'accept': 'text/plain', // Even if response is JSON, API might expect this header
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: data.email, password: data.password }),
+        // The API expects "username", so we map the form's "email" field to "username"
+        body: JSON.stringify({ username: data.email, password: data.password }), 
       });
 
       if (response.ok) {
         const result = await response.json();
-        // 예: 응답에 사용자 토큰 또는 세션 정보가 포함될 수 있습니다.
-        // localStorage.setItem('authToken', result.token); 
-        
-        toast({
-          title: "Login Successful",
-          description: "Welcome back!",
-        });
-        router.push("/dashboard");
+        console.log("API Response:", result);
+
+        if (result.isValidUser && result.token) {
+          // Store the token (e.g., in localStorage for this prototype)
+          // For production, consider more secure storage like HttpOnly cookies or secure storage solutions.
+          localStorage.setItem('authToken', result.token);
+          localStorage.setItem('tokenValidity', result.validity);
+          localStorage.setItem('apiExpiringOn', result.apiExpiringOn);
+          
+          toast({
+            title: "Login Successful",
+            description: "Welcome back!",
+          });
+          router.push("/dashboard");
+        } else {
+          toast({
+            title: "Login Failed",
+            description: result.message || "Invalid username or password, or user not valid.",
+            variant: "destructive",
+          });
+        }
       } else {
-        // API에서 오류 응답 처리
-        const errorData = await response.json();
+        // Handle non-OK HTTP responses (e.g., 400, 401, 500)
+        let errorMessage = "Login failed. Please check your credentials.";
+        try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.title || errorMessage;
+        } catch (e) {
+            // If response is not JSON or another error occurs during parsing
+            const textError = await response.text();
+            errorMessage = textError || `Server responded with ${response.status}.`;
+        }
         toast({
           title: "Login Failed",
-          description: errorData.message || "Invalid email or password.",
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -88,24 +107,12 @@ export default function LoginPage() {
       console.error("Login API call failed:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: "An unexpected error occurred during login. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-    */
-
-    // 현재는 시뮬레이션된 로그인입니다.
-    // 실제 API 호출로 교체한 후 아래 코드를 제거하거나 수정하십시오.
-    setTimeout(() => {
-      toast({
-        title: "Login Attempted (Simulated)",
-        description: "Login functionality is not yet fully implemented with a backend.",
-      });
-      router.push("/dashboard");
-      setIsLoading(false);
-    }, 1000); // 시뮬레이션된 네트워크 지연
   }
 
   return (
@@ -130,7 +137,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email (as Username)</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
