@@ -30,8 +30,8 @@ import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 const loginFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(1, { message: "Password is required." }), // Min 1 for simplicity, adjust as needed
+  username: z.string().min(1, { message: "Username or email is required." }),
+  password: z.string().min(1, { message: "Password is required." }),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -43,7 +43,7 @@ export default function LoginPage() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
@@ -56,11 +56,10 @@ export default function LoginPage() {
       const response = await fetch('https://api.classic7turf.com/Auth/Login', {
         method: 'POST',
         headers: {
-          'accept': 'text/plain', // Even if response is JSON, API might expect this header
+          'accept': 'text/plain',
           'Content-Type': 'application/json',
         },
-        // The API expects "username", so we map the form's "email" field to "username"
-        body: JSON.stringify({ username: data.email, password: data.password }), 
+        body: JSON.stringify({ username: data.username, password: data.password }),
       });
 
       if (response.ok) {
@@ -68,8 +67,6 @@ export default function LoginPage() {
         console.log("API Response:", result);
 
         if (result.isValidUser && result.token) {
-          // Store the token (e.g., in localStorage for this prototype)
-          // For production, consider more secure storage like HttpOnly cookies or secure storage solutions.
           localStorage.setItem('authToken', result.token);
           localStorage.setItem('tokenValidity', result.validity);
           localStorage.setItem('apiExpiringOn', result.apiExpiringOn);
@@ -87,13 +84,11 @@ export default function LoginPage() {
           });
         }
       } else {
-        // Handle non-OK HTTP responses (e.g., 400, 401, 500)
         let errorMessage = "Login failed. Please check your credentials.";
         try {
             const errorData = await response.json();
             errorMessage = errorData.message || errorData.title || errorMessage;
         } catch (e) {
-            // If response is not JSON or another error occurs during parsing
             const textError = await response.text();
             errorMessage = textError || `Server responded with ${response.status}.`;
         }
@@ -126,7 +121,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account.
+            Enter your username or email below to login to your account.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -134,14 +129,14 @@ export default function LoginPage() {
             <CardContent className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
+                name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (as Username)</FormLabel>
+                    <FormLabel>Username or Email</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
-                        placeholder="name@example.com"
+                        type="text"
+                        placeholder="your_username or name@example.com"
                         {...field}
                         disabled={isLoading}
                       />
