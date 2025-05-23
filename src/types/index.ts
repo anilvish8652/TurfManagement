@@ -1,4 +1,5 @@
 
+
 export interface Turf {
   id: string; // Mapped from turfID
   name: string; // Mapped from turfName
@@ -29,16 +30,17 @@ export interface Turf {
 }
 
 export interface Booking {
-  id: string;
-  turfId: string;
-  turfName: string; 
-  userId: string;
-  userName: string; 
-  startTime: Date;
-  endTime: Date;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
-  totalPrice: number;
-  bookedAt: Date;
+  id: string; // bookingID from API
+  turfId: string; // The turfID used for filtering the report
+  turfName: string; // turfBooked from API
+  userId?: string; // Not directly available from report API
+  userName: string; // bookingPersonName from API
+  startTime: Date; // Parsed from bookingDate & bookingSlots
+  endTime: Date; // Parsed from bookingDate & bookingSlots
+  status: 'confirmed' | 'pending_payment' | 'cancelled' | 'completed' | 'unknown'; // Derived
+  totalPrice: number; // amount from API
+  bookedAt: Date; // Parsed from bookingDate (date part only)
+  paymentStatusApi?: string; // Raw paymentStatus from API
 }
 
 export interface User {
@@ -119,7 +121,7 @@ export interface CreateBookingPayload {
 export interface ApiTurfListItem {
   turfID: string;
   turfName: string;
-  // ... other fields from GetTurfList if needed
+  // ... other fields from GetTurfList if needed for selection context
 }
 
 // Interface for the overall API response for GetTurfList
@@ -129,3 +131,33 @@ export interface ApiTurfListResponse {
   data: ApiTurfListItem[];
   // ... other fields from GetTurfList response
 }
+
+
+// API response types for Booking Reports
+export interface ApiBookingReportItem {
+  bookingID: string;
+  turfBooked: string;
+  bookingPersonName: string;
+  bookingDate: string; // "M/d/yyyy hh:mm:ss tt" e.g. "5/1/2025 12:00:00 AM"
+  bookingSlots: string; // "HH:mm-HH:mm" e.g. "07:00-08:30"
+  amount: string; // "1800.00"
+  balanceAmount: string;
+  discountAmount: string;
+  paymentStatus: string; // e.g. "Done"
+}
+
+export interface ApiBookingReportResponse {
+  requestid: string;
+  success: boolean;
+  message: string;
+  statuscode: number | null;
+  errors: any | null;
+  currentpage: number;
+  pagesize: number;
+  totalpages: number;
+  totalitems: number;
+  orderby: string;
+  orderbydesc: boolean;
+  data: ApiBookingReportItem[];
+}
+
