@@ -1,13 +1,31 @@
+
 export interface Turf {
-  id: string;
-  name: string;
-  location: string;
-  description: string;
-  pricing: number; // per hour or slot
-  images: string[]; // URLs to images
-  amenities: string[];
-  status: 'available' | 'maintenance' | 'closed';
-  operatingHours: { start: string; end: string }; // e.g., "08:00", "22:00"
+  id: string; // Mapped from turfID
+  name: string; // Mapped from turfName
+  
+  // Detailed location from API
+  turfAddress?: string;
+  turfCity?: string;
+  turfState?: string;
+  turfPinCode?: string;
+  
+  // Combined location for display
+  location: string; 
+
+  turfType?: string;
+  turfContactNo?: string;
+  turfEmail?: string;
+  
+  // Kept for compatibility, 'images' will be primary for display
+  rawImage?: string; // Stores the original turfImage string from API
+
+  // Original fields, some will be populated from API or defaulted
+  description?: string;
+  pricing?: number; // Not in list API, will be undefined or default
+  images: string[]; // Will use rawImage or placeholder
+  amenities?: string[]; // Not in list API
+  status?: 'available' | 'maintenance' | 'closed'; // Defaulted if not in API
+  operatingHours?: { start: string; end: string }; // Not in list API
 }
 
 export interface Booking {
