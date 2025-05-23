@@ -307,7 +307,7 @@ export default function AvailabilityPage() {
               Time Slots for {selectedTurf.name} on {format(selectedDate, "PPP")}
             </CardTitle>
             <CardDescription>
-              Green (Outline) = Available, Blue (Primary) = Selected for Booking, Grey (Secondary) = Booked by User.
+              Green (Outline) = Available, Blue (Primary) = Selected for Booking, Red (Destructive) = Booked.
               Click available slots to select them for booking.
             </CardDescription>
           </CardHeader>
@@ -328,12 +328,12 @@ export default function AvailabilityPage() {
                   const isApiBooked = slot.status === 'booked';
                   const isSelectedForBooking = selectedSlotIdsForBooking.includes(slot.id);
                   
-                  let variant: "default" | "secondary" | "outline" = 'outline';
+                  let variant: "default" | "secondary" | "outline" | "destructive" = 'outline';
                   let isDisabled = false;
                   let labelText = 'Available';
 
                   if (isApiBooked) {
-                    variant = 'secondary';
+                    variant = 'destructive';
                     isDisabled = true;
                     labelText = 'Booked';
                   } else if (isSelectedForBooking) { // slot.status must be 'available'
