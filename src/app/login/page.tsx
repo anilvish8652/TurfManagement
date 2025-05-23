@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Label import was present, good.
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -64,8 +63,9 @@ export default function LoginPage() {
         const result = await response.json();
         if (result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
-          localStorage.setItem('tokenValidity', result.validity);
-          localStorage.setItem('apiExpiringOn', result.apiExpiringOn);
+          // Optionally store other details from response if needed
+          // localStorage.setItem('tokenValidity', result.validity);
+          // localStorage.setItem('apiExpiringOn', result.apiExpiringOn);
           
           toast({
             title: "Login Successful",
@@ -80,11 +80,13 @@ export default function LoginPage() {
           });
         }
       } else {
-        let errorMessage = "Login failed. Please check your credentials.";
+        // Handle non-OK responses (e.g., 400, 401, 500)
+        let errorMessage = `Login failed. Status: ${response.status}`;
         try {
-            const errorData = await response.json();
+            const errorData = await response.json(); // Try to parse error response as JSON
             errorMessage = errorData.message || errorData.title || errorMessage;
         } catch (e) {
+            // If response is not JSON, use text
             const textError = await response.text();
             errorMessage = textError || `Server responded with ${response.status}.`;
         }
@@ -95,11 +97,11 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error("Login API call failed:", error);
+      console.error("Login API call failed:", error); // This console.error will show up in browser console
       const message = error instanceof Error ? error.message : "An unexpected error occurred during login.";
       toast({
         title: "Error",
-        description: `${message} Please try again.`,
+        description: `API request failed: ${message}. This could be due to a network issue, the API server being unavailable, or a CORS policy preventing the request. Please check your browser's console for more details.`,
         variant: "destructive",
       });
     } finally {
