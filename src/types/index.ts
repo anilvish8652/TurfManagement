@@ -1,5 +1,4 @@
 
-
 export interface Turf {
   id: string; // Mapped from turfID
   name: string; // Mapped from turfName
@@ -55,7 +54,7 @@ export interface User {
 // Updated TimeSlot interface
 export interface TimeSlot {
   id: string; // Mapped from slotID
-  turfId: string;
+  turfId: string; // Mapped from turfID in API response
   date: Date; // The specific date for this slot
   startTime: string; // "HH:mm"
   endTime: string; // "HH:mm"
@@ -97,4 +96,36 @@ export interface ApiAvailableSlotsResponse {
   orderby: string;
   orderbydesc: boolean;
   data: ApiSlotItem[];
+}
+
+// Payload for CreateBooking API
+export interface CreateBookingPayload {
+  fullName: string;
+  email: string;
+  mobileNumber: string;
+  altMobileNumber?: string;
+  turfID: string;
+  slotID: string[]; // API expects an array with a single comma-separated string: ["id1,id2,id3"]
+  bookingDate: string; // "YYYY-MM-DD"
+  advanceAmount: string; 
+  discountAmount: string; 
+  finalAmount: string; 
+  paymentMode: string;
+  transactionID: string;
+  paymentStatus: string;
+}
+
+// Interface for the API response structure for a single turf item in the GetTurfList data array
+export interface ApiTurfListItem {
+  turfID: string;
+  turfName: string;
+  // ... other fields from GetTurfList if needed
+}
+
+// Interface for the overall API response for GetTurfList
+export interface ApiTurfListResponse {
+  success: boolean;
+  message: string;
+  data: ApiTurfListItem[];
+  // ... other fields from GetTurfList response
 }

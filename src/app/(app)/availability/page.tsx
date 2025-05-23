@@ -5,26 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import { useState, useEffect, useCallback } from "react";
-import type { Turf, TimeSlot, ApiAvailableSlotsResponse } from "@/types";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import type { Turf, TimeSlot, ApiAvailableSlotsResponse, CreateBookingPayload, ApiTurfListItem, ApiTurfListResponse } from "@/types";
 import { format, parse } from "date-fns";
-import { Clock, Save, Loader2 } from "lucide-react";
+import { Clock, Save, Loader2, BookMarked } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-// Interface for the API response structure for a single turf item in the GetTurfList data array
-interface ApiTurfListItem {
-  turfID: string;
-  turfName: string;
-  // ... other fields from GetTurfList if needed, but only turfID and turfName are used for select
-}
-
-// Interface for the overall API response for GetTurfList
-interface ApiTurfListResponse {
-  success: boolean;
-  message: string;
-  data: ApiTurfListItem[];
-  // ... other fields from GetTurfList response
-}
+import { BookingFormDialog } from "@/components/booking/BookingFormDialog";
 
 
 export default function AvailabilityPage() {
@@ -34,10 +20,16 @@ export default function AvailabilityPage() {
   
   const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [initialTimeSlots, setInitialTimeSlots] = useState<TimeSlot[]>([]);
+  
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]); // For admin blocking/unblocking
+  const [initialTimeSlots, setInitialTimeSlots] = useState<TimeSlot[]>([]); // Original slots from API + admin changes
+  
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [slotError, setSlotError] = useState<string | null>(null);
+
+  const [selectedSlotIdsForBooking, setSelectedSlotIdsForBooking] = useState<string[]>([]);
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   const selectedTurf = turfsForSelect.find(t => t.id === selectedTurfId);
 
@@ -79,7 +71,7 @@ export default function AvailabilityPage() {
         }));
         setTurfsForSelect(transformedTurfs);
         if (transformedTurfs.length > 0 && !selectedTurfId) {
-          setSelectedTurfId(transformedTurfs[0].id); // Select the first turf by default
+          setSelectedTurfId(transformedTurfs[0].id); 
         }
       } else {
         throw new Error(result.message || "Failed to fetch turfs for selection.");
@@ -96,7 +88,7 @@ export default function AvailabilityPage() {
     } finally {
       setIsLoadingTurfs(false);
     }
-  }, [selectedTurfId]); // Added selectedTurfId to ensure default selection logic runs correctly if it was undefined
+  }, [selectedTurfId]); 
 
   useEffect(() => {
     fetchTurfsForSelect();
@@ -108,6 +100,7 @@ export default function AvailabilityPage() {
     setSlotError(null);
     setTimeSlots([]);
     setInitialTimeSlots([]);
+    setSelectedSlotIdsForBooking([]); // Clear booking selection
 
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -150,21 +143,20 @@ export default function AvailabilityPage() {
 
           return {
             id: apiSlot.slotID,
-            turfId: apiSlot.turfID,
+            turfId: apiSlot.turfID, // Store original turfID from slot data
             date: date, 
             startTime: format(parsedStartTime, "HH:mm"),
             endTime: format(parsedEndTime, "HH:mm"),
-            status: status,
+            status: status, // This is the API status
             price: apiSlot.price,
             dayOfWeek: apiSlot.dayOfWeek,
           };
         });
         setTimeSlots(transformedSlots);
-        setInitialTimeSlots(JSON.parse(JSON.stringify(transformedSlots)));
+        setInitialTimeSlots(JSON.parse(JSON.stringify(transformedSlots))); // For admin block/unblock diff
       } else if (!result.success && result.message.toLowerCase().includes("no slots available")) {
         setTimeSlots([]);
         setInitialTimeSlots([]);
-        // No need to throw an error, just show no slots
          toast({
           title: "No Slots",
           description: `No available slots for ${selectedTurf?.name} on ${format(date, "PPP")}.`,
@@ -193,25 +185,104 @@ export default function AvailabilityPage() {
     } else {
       setTimeSlots([]);
       setInitialTimeSlots([]);
+      setSelectedSlotIdsForBooking([]);
     }
   }, [selectedTurfId, selectedDate, fetchAvailableSlots]);
 
-  const handleSlotStatusChange = (slotId: string, newStatus: TimeSlot['status']) => {
+  // For admin blocking/unblocking slots
+  const handleAdminSlotStatusChange = (slotId: string) => {
     setTimeSlots(prevSlots =>
-      prevSlots.map(slot => slot.id === slotId ? { ...slot, status: newStatus } : slot)
+      prevSlots.map(slot => {
+        if (slot.id === slotId) {
+          // Ensure the slot was originally 'available' from API before admin can block it
+          const originalApiSlot = initialTimeSlots.find(is => is.id === slotId && is.status === 'available');
+          if (originalApiSlot) {
+            return { ...slot, status: slot.status === 'available' ? 'blocked_by_admin' : 'available' };
+          }
+        }
+        return slot;
+      })
     );
   };
 
-  const handleSaveChanges = () => {
-    console.log("Saving changes (simulated):", timeSlots.filter((s, i) => JSON.stringify(s) !== JSON.stringify(initialTimeSlots[i])));
-    toast({
-      title: "Changes Saved (Simulated)",
-      description: `Availability for ${selectedTurf?.name} on ${selectedDate ? format(selectedDate, "PPP") : ''} has been updated locally.`,
-    });
-    setInitialTimeSlots(JSON.parse(JSON.stringify(timeSlots)));
+  // For user selecting slots for booking
+  const toggleSlotSelectionForBooking = (slotId: string) => {
+    const slot = timeSlots.find(s => s.id === slotId);
+    // Can only select if it's 'available' (not 'booked' by API or 'blocked_by_admin' by admin)
+    if (slot && slot.status === 'available') {
+      setSelectedSlotIdsForBooking(prevSelected =>
+        prevSelected.includes(slotId)
+          ? prevSelected.filter(id => id !== slotId)
+          : [...prevSelected, slotId]
+      );
+    }
   };
 
-  const hasChanges = JSON.stringify(timeSlots) !== JSON.stringify(initialTimeSlots);
+  const handleAdminSaveChanges = () => {
+    // This would be an API call to update statuses of 'blocked_by_admin' slots
+    console.log("Saving admin changes (simulated):", timeSlots.filter((s, i) => JSON.stringify(s) !== JSON.stringify(initialTimeSlots[i])));
+    toast({
+      title: "Admin Changes Saved (Simulated)",
+      description: `Availability for ${selectedTurf?.name} on ${selectedDate ? format(selectedDate, "PPP") : ''} has been updated locally.`,
+    });
+    // Update initialTimeSlots to reflect the saved state if API call was successful
+    setInitialTimeSlots(JSON.parse(JSON.stringify(timeSlots)));
+  };
+  
+  const hasAdminChanges = JSON.stringify(timeSlots) !== JSON.stringify(initialTimeSlots);
+
+  const handleCreateBooking = async (payload: CreateBookingPayload) => {
+    setIsSubmittingBooking(true);
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      toast({ title: "Authentication Error", description: "Token not found.", variant: "destructive" });
+      setIsSubmittingBooking(false);
+      return;
+    }
+    try {
+      const response = await fetch('https://api.classic7turf.com/Turf/CreateBooking', {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `API Error: ${response.status}`);
+      }
+
+      toast({
+        title: "Booking Created!",
+        description: result.data || "Booking has been successfully created.",
+      });
+      setIsBookingDialogOpen(false);
+      setSelectedSlotIdsForBooking([]);
+      // Refresh slots for the current day to reflect the new booking
+      if (selectedTurfId && selectedDate) {
+        fetchAvailableSlots(selectedTurfId, selectedDate);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during booking.";
+      toast({
+        title: "Booking Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error("Create booking error:", error);
+    } finally {
+      setIsSubmittingBooking(false);
+    }
+  };
+  
+  const slotsForBookingDialog = useMemo(() => {
+    return timeSlots.filter(slot => selectedSlotIdsForBooking.includes(slot.id));
+  }, [timeSlots, selectedSlotIdsForBooking]);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -272,7 +343,8 @@ export default function AvailabilityPage() {
               Time Slots for {selectedTurf.name} on {format(selectedDate, "PPP")}
             </CardTitle>
             <CardDescription>
-              Click to toggle slot status between 'Available' and 'Blocked by Admin' (if not booked by API).
+              Green = Available, Blue = Selected for Booking, Red = Blocked by Admin, Grey = Booked by user.
+              Click available (green) slots to select them for booking.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -288,54 +360,87 @@ export default function AvailabilityPage() {
               </div>
             ) : timeSlots.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {timeSlots.map((slot) => (
-                  <Button
-                    key={slot.id}
-                    variant={
-                      slot.status === 'available' ? 'outline' :
-                      slot.status === 'booked' ? 'secondary' : 
-                      'destructive' // 'blocked_by_admin'
-                    }
-                    className="flex flex-col h-auto p-3 text-left"
-                    onClick={() => {
-                      const initialSlot = initialTimeSlots.find(is => is.id === slot.id);
-                      // Only allow toggling if the API did not mark it as 'booked'.
-                      if (initialSlot?.status !== 'booked') {
-                         if (slot.status === 'available') {
-                            handleSlotStatusChange(slot.id, 'blocked_by_admin');
-                         } else if (slot.status === 'blocked_by_admin') {
-                            handleSlotStatusChange(slot.id, 'available');
-                         }
-                      }
-                    }}
-                    disabled={initialTimeSlots.find(is => is.id === slot.id)?.status === 'booked'}
-                  >
-                    <div className="flex items-center gap-1 text-sm font-medium">
-                      <Clock className="h-3 w-3" /> {slot.startTime} - {slot.endTime}
-                    </div>
-                    <span className="text-xs capitalize mt-1">
-                      {slot.status.replace(/_/g, ' ')}
-                    </span>
-                     {slot.price && <span className="text-xs text-muted-foreground mt-0.5">₹{slot.price}</span>}
-                  </Button>
-                ))}
+                {timeSlots.map((slot) => {
+                  const isSelectedForBooking = selectedSlotIdsForBooking.includes(slot.id);
+                  const isApiBooked = initialTimeSlots.find(is => is.id === slot.id)?.status === 'booked';
+                  const isAdminBlocked = slot.status === 'blocked_by_admin';
+                  
+                  let variant: "default" | "secondary" | "destructive" | "outline" = 'outline'; // Default for 'available'
+                  if (isApiBooked) variant = 'secondary';
+                  else if (isAdminBlocked) variant = 'destructive';
+                  else if (isSelectedForBooking) variant = 'default'; // primary color
+
+                  return (
+                    <Button
+                      key={slot.id}
+                      variant={variant}
+                      className="flex flex-col h-auto p-3 text-left"
+                      onClick={() => {
+                        if (isApiBooked) return; // Cannot interact with API booked slots
+
+                        // Priority to booking selection if not admin blocked
+                        if (!isAdminBlocked) {
+                           toggleSlotSelectionForBooking(slot.id);
+                        }
+                        // If it's admin-blockable (was originally available)
+                        // This part is for the admin save changes button, not for immediate booking selection
+                        // For now, clicking only toggles booking selection for 'available' slots
+                        // To allow admin blocking, they'd need a different mode or confirm action
+                        // This demo focuses on user booking selection via click
+                        
+                        // To re-enable admin blocking on click (might be confusing with booking selection):
+                        // else if (initialTimeSlots.find(is => is.id === slot.id)?.status === 'available') {
+                        //  handleAdminSlotStatusChange(slot.id);
+                        // }
+
+                      }}
+                      disabled={isApiBooked}
+                    >
+                      <div className="flex items-center gap-1 text-sm font-medium">
+                        <Clock className="h-3 w-3" /> {slot.startTime} - {slot.endTime}
+                      </div>
+                      <span className="text-xs capitalize mt-1">
+                        {isApiBooked ? 'Booked' : isAdminBlocked ? 'Blocked by Admin' : isSelectedForBooking ? 'Selected' : 'Available'}
+                      </span>
+                      {slot.price && <span className="text-xs text-muted-foreground mt-0.5">₹{slot.price}</span>}
+                    </Button>
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-10">No time slots found for this turf on the selected date. This could be due to no availability or an issue fetching data.</p>
+              <p className="text-muted-foreground text-center py-10">No time slots found for this turf on the selected date.</p>
             )}
           </CardContent>
           {timeSlots.length > 0 && !isLoadingSlots && !slotError &&(
-            <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSaveChanges} disabled={!hasChanges}>
-                <Save className="mr-2 h-4 w-4" /> Save Changes
-              </Button>
+            <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row gap-2 justify-between items-center">
+                <div className="flex gap-2">
+                    <Button onClick={handleAdminSaveChanges} disabled={!hasAdminChanges}>
+                        <Save className="mr-2 h-4 w-4" /> Save Admin Changes
+                    </Button>
+                </div>
+                <Button 
+                    onClick={() => setIsBookingDialogOpen(true)} 
+                    disabled={selectedSlotIdsForBooking.length === 0}
+                    variant="default"
+                >
+                    <BookMarked className="mr-2 h-4 w-4" /> Book Selected Slot(s) ({selectedSlotIdsForBooking.length})
+                </Button>
             </CardFooter>
           )}
         </Card>
       )}
+
+      {selectedTurfId && selectedDate && (
+        <BookingFormDialog
+            isOpen={isBookingDialogOpen}
+            onOpenChange={setIsBookingDialogOpen}
+            turfId={selectedTurfId}
+            bookingDate={format(selectedDate, "yyyy-MM-dd")}
+            selectedSlots={slotsForBookingDialog}
+            onSubmitApi={handleCreateBooking}
+            isLoading={isSubmittingBooking}
+        />
+      )}
     </div>
   );
 }
-
-
-    
