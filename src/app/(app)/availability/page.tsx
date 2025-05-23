@@ -1,13 +1,15 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { useState, useEffect } from "react";
 import type { Turf, TimeSlot } from "@/types";
 import { format } from "date-fns";
-import { Clock } from "lucide-react";
+import { Clock, Save } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 // Dummy data
 const dummyTurfs: Pick<Turf, 'id' | 'name' | 'operatingHours'>[] = [
@@ -57,14 +59,18 @@ export default function AvailabilityPage() {
   const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(dummyTurfs[0]?.id);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [initialTimeSlots, setInitialTimeSlots] = useState<TimeSlot[]>([]); // To track changes
 
   const selectedTurf = dummyTurfs.find(t => t.id === selectedTurfId);
 
   useEffect(() => {
     if (selectedTurf && selectedDate) {
-      setTimeSlots(generateTimeSlots(selectedTurf, selectedDate));
+      const generatedSlots = generateTimeSlots(selectedTurf, selectedDate);
+      setTimeSlots(generatedSlots);
+      setInitialTimeSlots(JSON.parse(JSON.stringify(generatedSlots))); // Deep copy for comparison
     } else {
       setTimeSlots([]);
+      setInitialTimeSlots([]);
     }
   }, [selectedTurf, selectedDate]);
 
@@ -72,9 +78,23 @@ export default function AvailabilityPage() {
     setTimeSlots(prevSlots => 
       prevSlots.map(slot => slot.id === slotId ? { ...slot, status: newStatus } : slot)
     );
-    // In a real app, you would call an API to update the slot status here.
-    console.log(`Slot ${slotId} status changed to ${newStatus}`);
+    // In a real app, you would call an API to update the slot status here immediately,
+    // or mark as changed to be saved with a "Save Changes" button.
+    console.log(`Slot ${slotId} status changed to ${newStatus}. Click 'Save Changes' to persist.`);
   };
+
+  const handleSaveChanges = () => {
+    // In a real app, you would call an API to save the timeSlots array.
+    // For example, filter out only changed slots and send them.
+    console.log("Saving changes:", timeSlots);
+    toast({
+      title: "Changes Saved (Simulated)",
+      description: `Availability for ${selectedTurf?.name} on ${selectedDate ? format(selectedDate, "PPP") : ''} has been updated.`,
+    });
+    setInitialTimeSlots(JSON.parse(JSON.stringify(timeSlots))); // Update initial state after save
+  };
+  
+  const hasChanges = JSON.stringify(timeSlots) !== JSON.stringify(initialTimeSlots);
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,7 +139,7 @@ export default function AvailabilityPage() {
               Time Slots for {selectedTurf.name} on {format(selectedDate, "PPP")}
             </CardTitle>
             <CardDescription>
-              Operating Hours: {selectedTurf.operatingHours.start} - {selectedTurf.operatingHours.end}. Click to toggle slot status.
+              Operating Hours: {selectedTurf.operatingHours.start} - {selectedTurf.operatingHours.end}. Click to toggle slot status (except booked).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -135,17 +155,17 @@ export default function AvailabilityPage() {
                     }
                     className="flex flex-col h-auto p-3 text-left"
                     onClick={() => {
-                      if (slot.status !== 'booked') { // Prevent changing status of booked slots for simplicity
+                      if (slot.status !== 'booked') { 
                         handleSlotStatusChange(slot.id, slot.status === 'available' ? 'blocked_by_admin' : 'available')
                       }
                     }}
-                    disabled={slot.status === 'booked'} // Example: disable changing booked slots
+                    disabled={slot.status === 'booked'} 
                   >
                     <div className="flex items-center gap-1 text-sm font-medium">
                       <Clock className="h-3 w-3"/> {slot.startTime} - {slot.endTime}
                     </div>
                     <span className="text-xs capitalize mt-1">
-                      {slot.status.replace('_', ' ')}
+                      {slot.status.replace(/_/g, ' ')}
                     </span>
                   </Button>
                 ))}
@@ -154,6 +174,13 @@ export default function AvailabilityPage() {
               <p className="text-muted-foreground text-center">No time slots available for this turf on the selected date, or outside operating hours.</p>
             )}
           </CardContent>
+          {timeSlots.length > 0 && (
+            <CardFooter className="border-t px-6 py-4">
+              <Button onClick={handleSaveChanges} disabled={!hasChanges}>
+                <Save className="mr-2 h-4 w-4" /> Save Changes
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       )}
     </div>
