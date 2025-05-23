@@ -119,7 +119,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="mb-8 flex flex-col items-center text-center">
         <ToyBrick className="h-12 w-12 text-primary mb-2" />
-        <h1 className="text-3xl font-bold text-primary">TurfAdmin</h1>
+        <h1 className="text-3xl font-bold text-primary">Classic7</h1>
         <p className="text-muted-foreground">Welcome back! Please sign in to continue.</p>
       </div>
       <Card className="w-full max-w-sm shadow-xl">

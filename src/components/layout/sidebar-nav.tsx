@@ -1,6 +1,6 @@
+
 'use client';
 
-import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -18,11 +18,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { LogOut, Moon, Sun, ToyBrick } from 'lucide-react'; // ToyBrick as a generic logo
 import { Separator } from '../ui/separator';
+import { useEffect, useState } from 'react';
+
 
 // Dummy theme toggle for now
 const ThemeToggle = () => {
-  const [isDark, setIsDark] = React.useState(false);
-  React.useEffect(() => {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
     // Check for saved theme or system preference
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDark(document.documentElement.classList.contains('dark') || (!('theme' in localStorage) && prefersDark));
@@ -57,7 +59,7 @@ export function AppSidebarNav() {
         <Link href="/dashboard" className="flex items-center gap-2">
           <ToyBrick className="h-8 w-8 text-primary" />
           {sidebarState === 'expanded' && (
-            <h1 className="text-xl font-semibold">TurfAdmin</h1>
+            <h1 className="text-xl font-semibold">Classic7</h1>
           )}
         </Link>
       </SidebarHeader>

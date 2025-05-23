@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TurfAdmin',
+  title: 'Classic7',
   description: 'Administration panel for turf management',
 };
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -12,7 +13,7 @@ import { AppSidebarNav } from './sidebar-nav'; // For mobile drawer
 
 const getPageTitle = (pathname: string): string => {
   const currentNavItem = navItems.find(item => pathname.startsWith(item.href));
-  return currentNavItem?.title || 'TurfAdmin';
+  return currentNavItem?.title || 'Classic7';
 };
 
 export function AppHeader() {
