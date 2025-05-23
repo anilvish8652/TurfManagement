@@ -27,6 +27,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, ToyBrick } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -37,6 +38,8 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
@@ -45,14 +48,64 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(data: LoginFormValues) {
+  async function onSubmit(data: LoginFormValues) {
+    setIsLoading(true);
     console.log("Login submitted:", data);
-    toast({
-      title: "Login Attempted",
-      description: "Login functionality is not yet implemented.",
-    });
-    // Simulate successful login for now
-    router.push("/dashboard");
+
+    // ** 여기가 API를 호출할 위치입니다. **
+    // 아래는 API 호출의 예시입니다 (주석 처리됨).
+    // 실제 API 엔드포인트와 요청 본문으로 교체해야 합니다.
+    /*
+    try {
+      const response = await fetch('/api/your-dotnet-login-endpoint', { // 실제 엔드포인트로 교체
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // 예: 응답에 사용자 토큰 또는 세션 정보가 포함될 수 있습니다.
+        // localStorage.setItem('authToken', result.token); 
+        
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+        router.push("/dashboard");
+      } else {
+        // API에서 오류 응답 처리
+        const errorData = await response.json();
+        toast({
+          title: "Login Failed",
+          description: errorData.message || "Invalid email or password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Login API call failed:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+    */
+
+    // 현재는 시뮬레이션된 로그인입니다.
+    // 실제 API 호출로 교체한 후 아래 코드를 제거하거나 수정하십시오.
+    setTimeout(() => {
+      toast({
+        title: "Login Attempted (Simulated)",
+        description: "Login functionality is not yet fully implemented with a backend.",
+      });
+      router.push("/dashboard");
+      setIsLoading(false);
+    }, 1000); // 시뮬레이션된 네트워크 지연
   }
 
   return (
@@ -83,6 +136,7 @@ export default function LoginPage() {
                         type="email"
                         placeholder="name@example.com"
                         {...field}
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <FormMessage />
@@ -96,7 +150,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -104,8 +158,16 @@ export default function LoginPage() {
               />
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full">
-                <LogIn className="mr-2 h-4 w-4" /> Login
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <LogIn className="mr-2 h-4 w-4" />
+                )}
+                {isLoading ? "Logging in..." : "Login"}
               </Button>
               <div className="text-center text-sm">
                 <Link href="#" className="underline text-muted-foreground hover:text-primary">
