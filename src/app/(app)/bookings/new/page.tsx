@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -23,12 +24,10 @@ const bookingFormSchema = z.object({
   bookingDate: z.date({ required_error: "Booking date is required." }),
   startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid start time format (HH:MM)"),
   endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid end time format (HH:MM)"),
-  // totalPrice: z.coerce.number().positive("Total price must be positive"), // This could be calculated
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
-// Dummy data
 const dummyTurfs: Pick<Turf, 'id' | 'name' | 'pricing'>[] = [
   { id: "1", name: "Greenfield Arena", pricing: 50 },
   { id: "2", name: "City Soccer Park", pricing: 70 },
@@ -41,17 +40,27 @@ const dummyUsers: Pick<User, 'id' | 'name' | 'email'>[] = [
 
 export default function NewBookingPage() {
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
-      bookingDate: new Date(),
+      // Initialize with undefined or a static value, then update in useEffect
+      bookingDate: undefined, 
       startTime: "10:00",
       endTime: "11:00",
     },
   });
 
-  // Effect to calculate price
+  useEffect(() => {
+    // Set the bookingDate on the client side after hydration
+    form.reset({
+      ...form.getValues(), // keep other default values
+      bookingDate: new Date(),
+    });
+    setIsFormInitialized(true);
+  }, [form]);
+
   const { watch } = form;
   const turfId = watch("turfId");
   const startTime = watch("startTime");
@@ -84,6 +93,17 @@ export default function NewBookingPage() {
       description: `Booking for ${dummyUsers.find(u=>u.id === data.userId)?.name} at ${dummyTurfs.find(t=>t.id === data.turfId)?.name} has been made.`,
     });
     // router.push('/bookings');
+  }
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  if (!isFormInitialized) {
+    return (
+      <div className="flex flex-col gap-6 items-center justify-center h-full">
+        <p className="text-xl text-muted-foreground">Loading form...</p>
+      </div>
+    );
   }
 
   return (
@@ -184,7 +204,7 @@ export default function NewBookingPage() {
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                          disabled={(date) => date < today}
                           initialFocus
                         />
                       </PopoverContent>

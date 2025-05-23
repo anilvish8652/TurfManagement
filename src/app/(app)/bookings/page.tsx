@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const dummyBookings: Booking[] = [
   { id: "B001", turfId: "1", turfName: "Greenfield Arena", userId: "U001", userName: "John Doe", startTime: new Date(Date.now() + 86400000 * 1), endTime: new Date(Date.now() + 86400000 * 1 + 3600000 * 2), status: 'confirmed', totalPrice: 100, bookedAt: new Date() },
@@ -22,8 +23,12 @@ const dummyBookings: Booking[] = [
 ];
 
 export default function BookingsPage() {
-  // Placeholder for date state
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    // Initialize date on the client side
+    setDate(new Date());
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">

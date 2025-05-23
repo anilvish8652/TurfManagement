@@ -20,7 +20,7 @@ const dummyTurfs: Pick<Turf, 'id' | 'name' | 'operatingHours'>[] = [
 
 // Function to generate time slots based on operating hours
 const generateTimeSlots = (turf: Pick<Turf, 'id' | 'name' | 'operatingHours'> | undefined, date: Date): TimeSlot[] => {
-  if (!turf) return [];
+  if (!turf || !date) return [];
 
   const slots: TimeSlot[] = [];
   const { start, end } = turf.operatingHours;
@@ -57,11 +57,16 @@ const generateTimeSlots = (turf: Pick<Turf, 'id' | 'name' | 'operatingHours'> | 
 
 export default function AvailabilityPage() {
   const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(dummyTurfs[0]?.id);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [initialTimeSlots, setInitialTimeSlots] = useState<TimeSlot[]>([]); // To track changes
 
   const selectedTurf = dummyTurfs.find(t => t.id === selectedTurfId);
+
+  useEffect(() => {
+    // Initialize selectedDate on the client side
+    setSelectedDate(new Date());
+  }, []);
 
   useEffect(() => {
     if (selectedTurf && selectedDate) {
@@ -78,14 +83,10 @@ export default function AvailabilityPage() {
     setTimeSlots(prevSlots => 
       prevSlots.map(slot => slot.id === slotId ? { ...slot, status: newStatus } : slot)
     );
-    // In a real app, you would call an API to update the slot status here immediately,
-    // or mark as changed to be saved with a "Save Changes" button.
     console.log(`Slot ${slotId} status changed to ${newStatus}. Click 'Save Changes' to persist.`);
   };
 
   const handleSaveChanges = () => {
-    // In a real app, you would call an API to save the timeSlots array.
-    // For example, filter out only changed slots and send them.
     console.log("Saving changes:", timeSlots);
     toast({
       title: "Changes Saved (Simulated)",
@@ -95,6 +96,9 @@ export default function AvailabilityPage() {
   };
   
   const hasChanges = JSON.stringify(timeSlots) !== JSON.stringify(initialTimeSlots);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,13 +125,17 @@ export default function AvailabilityPage() {
             </Select>
           </div>
           <div className="md:col-span-2">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-              disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
-            />
+            {selectedDate ? (
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                className="rounded-md border"
+                disabled={(date) => date < today} // Disable past dates
+              />
+            ) : (
+              <div className="rounded-md border p-3 h-[290px] flex items-center justify-center text-muted-foreground">Loading calendar...</div>
+            )}
           </div>
         </CardContent>
       </Card>
