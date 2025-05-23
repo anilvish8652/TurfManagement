@@ -16,10 +16,10 @@ import { format } from "date-fns";
 import { useState, useEffect } from "react";
 
 const dummyBookings: Booking[] = [
-  { id: "B001", turfId: "1", turfName: "Greenfield Arena", userId: "U001", userName: "John Doe", startTime: new Date(Date.now() + 86400000 * 1), endTime: new Date(Date.now() + 86400000 * 1 + 3600000 * 2), status: 'confirmed', totalPrice: 100, bookedAt: new Date() },
-  { id: "B002", turfId: "2", turfName: "City Soccer Park", userId: "U002", userName: "Jane Smith", startTime: new Date(Date.now() + 86400000 * 2), endTime: new Date(Date.now() + 86400000 * 2 + 3600000 * 1), status: 'pending', totalPrice: 70, bookedAt: new Date() },
-  { id: "B003", turfId: "1", turfName: "Greenfield Arena", userId: "U003", userName: "Alice Johnson", startTime: new Date(Date.now() - 86400000 * 1), endTime: new Date(Date.now() - 86400000 * 1 + 3600000 * 1.5), status: 'completed', totalPrice: 75, bookedAt: new Date(Date.now() - 86400000 * 2) },
-  { id: "B004", turfId: "3", turfName: "Rooftop Kickers", userId: "U001", userName: "John Doe", startTime: new Date(Date.now() + 86400000 * 3), endTime: new Date(Date.now() + 86400000 * 3 + 3600000 * 1), status: 'cancelled', totalPrice: 60, bookedAt: new Date() },
+  { id: "B001", turfId: "1", turfName: "Greenfield Arena", userId: "U001", userName: "John Doe", startTime: new Date(2025, 4, 25, 10, 0), endTime: new Date(2025, 4, 25, 12, 0), status: 'confirmed', totalPrice: 100, bookedAt: new Date(2025, 4, 20) },
+  { id: "B002", turfId: "2", turfName: "City Soccer Park", userId: "U002", userName: "Jane Smith", startTime: new Date(2025, 5, 10, 14, 0), endTime: new Date(2025, 5, 10, 15, 0), status: 'pending', totalPrice: 70, bookedAt: new Date(2025, 5, 1) },
+  { id: "B003", turfId: "1", turfName: "Greenfield Arena", userId: "U003", userName: "Alice Johnson", startTime: new Date(2024, 3, 15, 16, 30), endTime: new Date(2024, 3, 15, 18, 0), status: 'completed', totalPrice: 75, bookedAt: new Date(2024, 3, 10) },
+  { id: "B004", turfId: "3", turfName: "Rooftop Kickers", userId: "U001", userName: "John Doe", startTime: new Date(2025, 6, 1, 9, 0), endTime: new Date(2025, 6, 1, 10, 0), status: 'cancelled', totalPrice: 60, bookedAt: new Date(2025, 5, 28) },
 ];
 
 export default function BookingsPage() {
