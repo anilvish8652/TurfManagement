@@ -36,7 +36,7 @@ const generateTimeSlots = (turf: Pick<Turf, 'id' | 'name' | 'operatingHours'> | 
   let idCounter = 0;
   while (currentTime < endTimeToday) {
     const slotStart = new Date(currentTime);
-    const slotEnd = new Date(currentTime.getTime() + 60 * 60 * 1000); // 1-hour slots
+    const slotEnd = new Date(currentTime.getTime() + 30 * 60 * 1000); // 30-minute slots
 
     if (slotEnd > endTimeToday) break; // Do not create slots past operating end time
 
