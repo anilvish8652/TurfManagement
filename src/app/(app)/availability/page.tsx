@@ -11,26 +11,97 @@ import { format, parse } from "date-fns";
 import { Clock, Save, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-// Dummy data for turfs - ensure IDs match what your API expects for turfID
-const dummyTurfs: Pick<Turf, 'id' | 'name'>[] = [
-  { id: "1", name: "Green Field Turf" },
-  { id: "2", name: "Urban Kick Arena" },
-  { id: "3", name: "AstroTurf Pro Ground" },
-];
+// Interface for the API response structure for a single turf item in the GetTurfList data array
+interface ApiTurfListItem {
+  turfID: string;
+  turfName: string;
+  // ... other fields from GetTurfList if needed, but only turfID and turfName are used for select
+}
+
+// Interface for the overall API response for GetTurfList
+interface ApiTurfListResponse {
+  success: boolean;
+  message: string;
+  data: ApiTurfListItem[];
+  // ... other fields from GetTurfList response
+}
+
 
 export default function AvailabilityPage() {
-  const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(dummyTurfs[0]?.id);
+  const [turfsForSelect, setTurfsForSelect] = useState<Pick<Turf, 'id' | 'name'>[]>([]);
+  const [isLoadingTurfs, setIsLoadingTurfs] = useState(true);
+  const [turfListError, setTurfListError] = useState<string | null>(null);
+  
+  const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [initialTimeSlots, setInitialTimeSlots] = useState<TimeSlot[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [slotError, setSlotError] = useState<string | null>(null);
 
-  const selectedTurf = dummyTurfs.find(t => t.id === selectedTurfId);
+  const selectedTurf = turfsForSelect.find(t => t.id === selectedTurfId);
 
   useEffect(() => {
     setSelectedDate(new Date()); // Initialize selectedDate on client
   }, []);
+
+  const fetchTurfsForSelect = useCallback(async () => {
+    setIsLoadingTurfs(true);
+    setTurfListError(null);
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setTurfListError("Authentication token not found. Please login again.");
+      setIsLoadingTurfs(false);
+      toast({ title: "Authentication Error", description: "Token not found for fetching turfs.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.classic7turf.com/Turf/GetTurfList?page=1&pageSize=100', {
+        method: 'GET',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error fetching turfs: ${response.status} - ${errorData || response.statusText}`);
+      }
+
+      const result: ApiTurfListResponse = await response.json();
+
+      if (result.success && result.data) {
+        const transformedTurfs: Pick<Turf, 'id' | 'name'>[] = result.data.map(apiTurf => ({
+          id: apiTurf.turfID,
+          name: apiTurf.turfName,
+        }));
+        setTurfsForSelect(transformedTurfs);
+        if (transformedTurfs.length > 0 && !selectedTurfId) {
+          setSelectedTurfId(transformedTurfs[0].id); // Select the first turf by default
+        }
+      } else {
+        throw new Error(result.message || "Failed to fetch turfs for selection.");
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching turfs.";
+      setTurfListError(errorMessage);
+      toast({
+        title: "Failed to load turfs",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error("Fetch turfs for select error:", err);
+    } finally {
+      setIsLoadingTurfs(false);
+    }
+  }, [selectedTurfId]); // Added selectedTurfId to ensure default selection logic runs correctly if it was undefined
+
+  useEffect(() => {
+    fetchTurfsForSelect();
+  }, [fetchTurfsForSelect]);
+
 
   const fetchAvailableSlots = useCallback(async (turfId: string, date: Date) => {
     setIsLoadingSlots(true);
@@ -42,7 +113,7 @@ export default function AvailabilityPage() {
     if (!token) {
       setSlotError("Authentication token not found. Please login again.");
       setIsLoadingSlots(false);
-      toast({ title: "Authentication Error", description: "Token not found.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: "Token not found for fetching slots.", variant: "destructive" });
       return;
     }
 
@@ -60,7 +131,7 @@ export default function AvailabilityPage() {
 
       if (!response.ok) {
         const errorData = await response.text();
-        throw new Error(`API Error: ${response.status} - ${errorData || response.statusText}`);
+        throw new Error(`API Error fetching slots: ${response.status} - ${errorData || response.statusText}`);
       }
 
       const result: ApiAvailableSlotsResponse = await response.json();
@@ -71,18 +142,16 @@ export default function AvailabilityPage() {
           if (apiSlot.slotStatus.toLowerCase() === 'available') {
             status = 'available';
           } else {
-            // Consider other statuses like "Booked", "Pending" as 'booked' for display
             status = 'booked'; 
           }
           
-          // Parse time string "HH:mm:ss" and format to "HH:mm"
           const parsedStartTime = parse(apiSlot.startTime, "HH:mm:ss", new Date());
           const parsedEndTime = parse(apiSlot.endTime, "HH:mm:ss", new Date());
 
           return {
             id: apiSlot.slotID,
             turfId: apiSlot.turfID,
-            date: date, // The date for which these slots were fetched
+            date: date, 
             startTime: format(parsedStartTime, "HH:mm"),
             endTime: format(parsedEndTime, "HH:mm"),
             status: status,
@@ -92,7 +161,16 @@ export default function AvailabilityPage() {
         });
         setTimeSlots(transformedSlots);
         setInitialTimeSlots(JSON.parse(JSON.stringify(transformedSlots)));
-      } else {
+      } else if (!result.success && result.message.toLowerCase().includes("no slots available")) {
+        setTimeSlots([]);
+        setInitialTimeSlots([]);
+        // No need to throw an error, just show no slots
+         toast({
+          title: "No Slots",
+          description: `No available slots for ${selectedTurf?.name} on ${format(date, "PPP")}.`,
+        });
+      }
+      else {
         throw new Error(result.message || "Failed to fetch available slots.");
       }
     } catch (err) {
@@ -107,7 +185,7 @@ export default function AvailabilityPage() {
     } finally {
       setIsLoadingSlots(false);
     }
-  }, []);
+  }, [selectedTurf?.name]);
 
   useEffect(() => {
     if (selectedTurfId && selectedDate) {
@@ -148,18 +226,28 @@ export default function AvailabilityPage() {
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-1">
-            <Select value={selectedTurfId} onValueChange={setSelectedTurfId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a turf" />
-              </SelectTrigger>
-              <SelectContent>
-                {dummyTurfs.map((turf) => (
-                  <SelectItem key={turf.id} value={turf.id}>
-                    {turf.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingTurfs ? (
+              <div className="flex items-center">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading turfs...
+              </div>
+            ) : turfListError ? (
+              <div className="text-destructive">Error: {turfListError}</div>
+            ) : turfsForSelect.length === 0 ? (
+                <p className="text-muted-foreground">No turfs available for selection.</p>
+            ) : (
+              <Select value={selectedTurfId} onValueChange={setSelectedTurfId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a turf" />
+                </SelectTrigger>
+                <SelectContent>
+                  {turfsForSelect.map((turf) => (
+                    <SelectItem key={turf.id} value={turf.id}>
+                      {turf.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="md:col-span-2">
             {selectedDate ? (
@@ -184,7 +272,7 @@ export default function AvailabilityPage() {
               Time Slots for {selectedTurf.name} on {format(selectedDate, "PPP")}
             </CardTitle>
             <CardDescription>
-              Click to toggle slot status between 'Available' and 'Blocked by Admin' (if not booked).
+              Click to toggle slot status between 'Available' and 'Blocked by Admin' (if not booked by API).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -205,20 +293,21 @@ export default function AvailabilityPage() {
                     key={slot.id}
                     variant={
                       slot.status === 'available' ? 'outline' :
-                      slot.status === 'booked' ? 'secondary' : // 'booked' or any other non-available status from API
+                      slot.status === 'booked' ? 'secondary' : 
                       'destructive' // 'blocked_by_admin'
                     }
                     className="flex flex-col h-auto p-3 text-left"
                     onClick={() => {
-                      // Only allow toggling for slots that were originally 'available'
                       const initialSlot = initialTimeSlots.find(is => is.id === slot.id);
-                      if (initialSlot?.status === 'available' && slot.status !== 'booked') {
-                        handleSlotStatusChange(slot.id, slot.status === 'available' ? 'blocked_by_admin' : 'available');
-                      } else if (slot.status === 'blocked_by_admin') { // Allow unblocking
-                         handleSlotStatusChange(slot.id, 'available');
+                      // Only allow toggling if the API did not mark it as 'booked'.
+                      if (initialSlot?.status !== 'booked') {
+                         if (slot.status === 'available') {
+                            handleSlotStatusChange(slot.id, 'blocked_by_admin');
+                         } else if (slot.status === 'blocked_by_admin') {
+                            handleSlotStatusChange(slot.id, 'available');
+                         }
                       }
                     }}
-                    // Disable if API said it's booked or any other non-original-available status
                     disabled={initialTimeSlots.find(is => is.id === slot.id)?.status === 'booked'}
                   >
                     <div className="flex items-center gap-1 text-sm font-medium">
@@ -232,7 +321,7 @@ export default function AvailabilityPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-10">No time slots found for this turf on the selected date.</p>
+              <p className="text-muted-foreground text-center py-10">No time slots found for this turf on the selected date. This could be due to no availability or an issue fetching data.</p>
             )}
           </CardContent>
           {timeSlots.length > 0 && !isLoadingSlots && !slotError &&(
@@ -247,3 +336,6 @@ export default function AvailabilityPage() {
     </div>
   );
 }
+
+
+    
