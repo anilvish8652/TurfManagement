@@ -70,10 +70,9 @@ export default function BookingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // For now, use static filter values from cURL. Will be dynamic later.
-  const [filterTurfId, setFilterTurfId] = useState<string>("1"); // Default to "1" or make selectable
-  const [filterFromDate, setFilterFromDate] = useState<Date | undefined>(new Date(2025, 0, 1)); // Jan 1, 2025
-  const [filterToDate, setFilterToDate] = useState<Date | undefined>(new Date(2025, 4, 20)); // May 20, 2025
+  const [filterTurfId, setFilterTurfId] = useState<string>("1"); 
+  const [filterFromDate, setFilterFromDate] = useState<Date | undefined>(undefined); 
+  const [filterToDate, setFilterToDate] = useState<Date | undefined>(undefined); 
 
   const [statusFilter, setStatusFilter] = useState<Booking['status'][]>(['confirmed', 'pending_payment', 'completed', 'cancelled', 'unknown']);
 
@@ -164,9 +163,10 @@ export default function BookingsPage() {
   }, []);
 
   useEffect(() => {
-    // Initialize dates on the client side if not already set
-    if (!filterFromDate) setFilterFromDate(new Date(2025, 0, 1));
-    if (!filterToDate) setFilterToDate(new Date(2025, 4, 20));
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (!filterFromDate) setFilterFromDate(firstDayOfMonth);
+    if (!filterToDate) setFilterToDate(today);
 
     if (filterTurfId && filterFromDate && filterToDate) {
       fetchBookingReports(filterTurfId, filterFromDate, filterToDate);
@@ -189,7 +189,7 @@ export default function BookingsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Booking Management</h1>
         <Button asChild>
-          <Link href="/bookings/new">
+          <Link href="/availability">
             <PlusCircle className="mr-2 h-4 w-4" /> Create New Booking
           </Link>
         </Button>
@@ -199,11 +199,10 @@ export default function BookingsPage() {
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <CardTitle>All Bookings</CardTitle>
-            <CardDescription>View, filter, and manage all bookings. (Filters for Turf ID, From/To Date are not yet active)</CardDescription>
+            <CardDescription>View, filter, and manage all bookings. (Filters for Turf ID are not yet active)</CardDescription>
           </div>
           <div className="flex gap-2 items-center w-full sm:w-auto">
             <Input placeholder="Search by name or turf..." className="max-w-sm w-full sm:w-auto" />
-            {/* Placeholder for From Date */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -223,7 +222,6 @@ export default function BookingsPage() {
                 />
               </PopoverContent>
             </Popover>
-            {/* Placeholder for To Date */}
              <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -332,7 +330,6 @@ export default function BookingsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem>View Details</DropdownMenuItem>
-                          {/* Add more actions based on booking status */}
                           {booking.status === 'pending_payment' && <DropdownMenuItem>Mark as Confirmed</DropdownMenuItem>}
                           {booking.status === 'confirmed' && <DropdownMenuItem>Mark as Completed</DropdownMenuItem>}
                           {(booking.status === 'confirmed' || booking.status === 'pending_payment') && 

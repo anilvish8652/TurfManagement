@@ -60,7 +60,7 @@ export interface TimeSlot {
   date: Date; // The specific date for this slot
   startTime: string; // "HH:mm"
   endTime: string; // "HH:mm"
-  status: 'available' | 'booked' | 'blocked_by_admin' | 'unavailable'; // 'unavailable' if not in API response or outside known hours
+  status: 'available' | 'booked' | 'unavailable'; // 'unavailable' if not in API response or outside known hours
   price?: string; // From API
   dayOfWeek?: string; // From API, optional
 }
