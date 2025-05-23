@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label"; // Label import was present, good.
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -50,13 +50,11 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Login submitted with:", data);
-
     try {
       const response = await fetch('https://api.classic7turf.com/Auth/Login', {
         method: 'POST',
         headers: {
-          'accept': 'text/plain',
+          'accept': 'text/plain', // API example showed this, though response is JSON
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username: data.username, password: data.password }),
@@ -64,8 +62,6 @@ export default function LoginPage() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("API Response:", result);
-
         if (result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
           localStorage.setItem('tokenValidity', result.validity);
@@ -100,9 +96,10 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login API call failed:", error);
+      const message = error instanceof Error ? error.message : "An unexpected error occurred during login.";
       toast({
         title: "Error",
-        description: "An unexpected error occurred during login. Please try again.",
+        description: `${message} Please try again.`,
         variant: "destructive",
       });
     } finally {
