@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
-import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, PaymentDetail, UpdateBookingPayload } from "@/types";
+import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, PaymentDetail, UpdateBookingPayload, ApiBookingDetailsResponse } from "@/types";
 import Link from "next/link";
 import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -278,14 +278,14 @@ export default function BookingsPage() {
         body: JSON.stringify(payload),
       });
 
-      const resultText = await response.text(); // API seems to return plain text for success
+      const responseText = await response.text(); 
       
       if (!response.ok) {
-        // Try to parse as JSON if it's an error object, otherwise use text
-        let errorMessage = resultText;
+        let errorMessage = responseText;
         try {
-          const errorJson = JSON.parse(resultText);
-          errorMessage = errorJson.message || resultText;
+          // If error response is JSON, try to parse its message
+          const errorJson = JSON.parse(responseText);
+          errorMessage = errorJson.message || responseText;
         } catch (e) {
           // It wasn't JSON, use the text itself
         }
@@ -295,7 +295,7 @@ export default function BookingsPage() {
       // Assuming successful update if response.ok is true, as the success response is plain text
       toast({
         title: "Booking Updated!",
-        description: resultText || "Booking has been successfully updated.",
+        description: responseText || "Booking has been successfully updated.",
       });
       setIsUpdateDialogOpen(false);
       if (filterTurfId && filterFromDate && filterToDate) {
@@ -501,3 +501,4 @@ export default function BookingsPage() {
     </div>
   );
 }
+
