@@ -51,8 +51,8 @@ export default function LoginPage() {
     setIsLoading(true);
     // Use the proxy path defined in next.config.ts
     const apiEndpoint = '/api-proxy/Auth/Login'; 
-    const requestHeaders = {
-      // 'accept': 'text/plain', // Keep or remove based on what proxy forwards/API strictly needs
+    const requestHeaders: HeadersInit = {
+      'accept': 'text/plain', // Reinstated this header
       'Content-Type': 'application/json',
     };
 
@@ -73,8 +73,19 @@ export default function LoginPage() {
       console.log("Fetch response ok:", response.ok);
 
       if (response.ok) {
-        const result = await response.json();
-        console.log("API Login Result:", result);
+        const result = await response.json().catch(async (jsonError) => {
+          // If .json() fails, try to read as text (as API might return plain text for success despite 'accept' header)
+          console.warn("Failed to parse login response as JSON, trying as text. Error:", jsonError);
+          const textResponse = await response.text();
+          console.log("Login API Text Response:", textResponse);
+          // Try to manually construct a success object if text indicates success, or handle appropriately
+          // This part is tricky as the API 'accept: text/plain' suggests it might not always return JSON on success
+          // For now, we assume the cURL response showing JSON is the primary success path.
+          // If the API truly returns plain text for success, this logic needs adjustment.
+          throw new Error("Login response was not valid JSON, and text parsing needs specific handling for success.");
+        });
+        
+        console.log("API Login Result (parsed as JSON):", result);
         if (result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
           toast({
@@ -94,7 +105,6 @@ export default function LoginPage() {
         let errorBody = "Could not read error body.";
         try {
             errorBody = await response.text(); 
-            // Attempt to parse as JSON if it looks like it, to get a 'message' field
             if (errorBody.trim().startsWith('{')) {
               try {
                 const errorJson = JSON.parse(errorBody);
@@ -110,9 +120,13 @@ export default function LoginPage() {
         }
         console.error("Login API responded with an error:", response.status, errorBody);
         
-        let toastDescription = `Server responded with ${response.status}. ${errorBody}`;
+        let toastDescription = `Server responded with ${response.status}.`;
+        const displayErrorBody = errorBody.length > 150 ? errorBody.substring(0, 150) + "..." : errorBody;
+
         if (response.status === 500) {
-          toastDescription = `An internal server error occurred. Please try again later. (Details: ${errorBody})`;
+          toastDescription = `An internal server error occurred on the API (500). Please check the API server logs. (Details: ${displayErrorBody})`;
+        } else if (displayErrorBody && !displayErrorBody.toLowerCase().includes("internal server error")) { // Avoid redundant message
+            toastDescription += ` ${displayErrorBody}`;
         }
 
         toast({
@@ -128,7 +142,7 @@ export default function LoginPage() {
       if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
         userMessage = "Network error: Could not connect to the API. This might be due to a network issue, the API server being unavailable, or a CORS policy if not using the proxy. Please check your internet connection and the browser console for more details.";
         console.warn(
-          "A 'Failed to fetch' error occurred. Ensure the proxy in next.config.js is correctly configured and the target API server is running and accessible from the Next.js server environment."
+          "A 'Failed to fetch' error occurred. Ensure the proxy in next.config.js is correctly configured and the target API server is running and accessible from the Next.js server environment. If the API server has CORS issues, this proxy is intended to help."
         );
       } else if (error instanceof Error) {
         userMessage = `Login error: ${error.message}`;
