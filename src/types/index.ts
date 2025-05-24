@@ -1,5 +1,4 @@
 
-
 export interface Turf {
   id: string; // Mapped from turfID
   name: string; // Mapped from turfName
@@ -60,7 +59,7 @@ export interface TimeSlot {
   date: Date; // The specific date for this slot
   startTime: string; // "HH:mm"
   endTime: string; // "HH:mm"
-  status: 'available' | 'booked' | 'unavailable'; // 'unavailable' if not in API response or outside known hours
+  status: 'available' | 'booked' | 'unavailable';
   price?: string; // From API
   dayOfWeek?: string; // From API, optional
 }
@@ -161,3 +160,44 @@ export interface ApiBookingReportResponse {
   data: ApiBookingReportItem[];
 }
 
+// API response types for GetBookingDetails
+export interface PaymentDetail {
+  BookingID: string;
+  PaymentID: string;
+  PaymentMode: string;
+  TransactionID: string;
+  PaidAmount: number;
+  PaymentDate: string; // "YYYY-MM-DDTHH:mm:ss.sss"
+  DiscountAmount: number;
+}
+
+export interface ApiBookingDetailItem {
+  userID: string;
+  username: string;
+  email: string;
+  mobileNo: string;
+  bookingID: string;
+  turfBooked: string;
+  turfAddress: string;
+  dayBooked: string;
+  bookingSlots: string; // "HH:mm-HH:mm"
+  amount: string; // "1950.00"
+  balanceAmount: string; // "0.00"
+  paymentDetails: string; // This is a JSON string that needs to be parsed
+  parsedPaymentDetails?: PaymentDetail[]; // Optional: to store the parsed version
+}
+
+export interface ApiBookingDetailsResponse {
+  requestid: string;
+  success: boolean;
+  message: string;
+  statuscode: number | null;
+  errors: any | null;
+  currentpage: number;
+  pagesize: number;
+  totalpages: number;
+  totalitems: number;
+  orderby: string;
+  orderbydesc: boolean;
+  data: ApiBookingDetailItem[]; // Expecting an array with one item
+}

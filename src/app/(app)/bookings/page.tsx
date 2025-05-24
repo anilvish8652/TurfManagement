@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
-import type { Booking, ApiBookingReportItem, ApiBookingReportResponse } from "@/types";
+import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, ApiBookingDetailsResponse, PaymentDetail } from "@/types";
 import Link from "next/link";
 import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, parse } from "date-fns";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
+import { BookingDetailsDialog } from "@/components/booking/BookingDetailsDialog";
 
 
 const parseBookingDateTime = (apiBookingDate: string, apiBookingSlots: string): { startTime: Date, endTime: Date, bookedAt: Date } => {
@@ -75,6 +75,11 @@ export default function BookingsPage() {
   const [filterToDate, setFilterToDate] = useState<Date | undefined>(undefined); 
 
   const [statusFilter, setStatusFilter] = useState<Booking['status'][]>(['confirmed', 'pending_payment', 'completed', 'cancelled', 'unknown']);
+
+  const [selectedBookingForDetails, setSelectedBookingForDetails] = useState<ApiBookingDetailItem | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
 
   const fetchBookingReports = useCallback(async (turfID: string, fromDate: Date, toDate: Date) => {
@@ -182,6 +187,65 @@ export default function BookingsPage() {
   const filteredBookings = useMemo(() => {
     return bookings.filter(booking => statusFilter.includes(booking.status));
   }, [bookings, statusFilter]);
+
+  const handleViewDetails = async (bookingId: string) => {
+    setIsLoadingDetails(true);
+    setDetailsError(null);
+    setSelectedBookingForDetails(null);
+    setIsDetailsDialogOpen(true);
+
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setDetailsError("Authentication token not found.");
+      setIsLoadingDetails(false);
+      toast({ title: "Authentication Error", description: "Token not found for fetching details.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.classic7turf.com/Turf/GetBookingDetails?page=1&pageSize=100&BookingID=${bookingId}`, {
+        method: 'GET',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorData || response.statusText}`);
+      }
+
+      const result: ApiBookingDetailsResponse = await response.json();
+
+      if (result.success && result.data && result.data.length > 0) {
+        const details = result.data[0];
+        try {
+          if (details.paymentDetails) {
+            const parsed = JSON.parse(details.paymentDetails);
+            details.parsedPaymentDetails = parsed.PaymentDetails as PaymentDetail[];
+          } else {
+            details.parsedPaymentDetails = [];
+          }
+        } catch (parseError) {
+          console.error("Failed to parse paymentDetails JSON:", parseError);
+          details.parsedPaymentDetails = [];
+          toast({ title: "Warning", description: "Could not parse payment details.", variant: "default" });
+        }
+        setSelectedBookingForDetails(details);
+      } else if (!result.success) {
+        throw new Error(result.message || "Failed to fetch booking details.");
+      } else {
+         throw new Error("No booking details found for this ID.");
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setDetailsError(errorMessage);
+      toast({ title: "Error Fetching Details", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
 
 
   return (
@@ -329,7 +393,9 @@ export default function BookingsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(booking.id)}>
+                            View Details
+                          </DropdownMenuItem>
                           {booking.status === 'pending_payment' && <DropdownMenuItem>Mark as Confirmed</DropdownMenuItem>}
                           {booking.status === 'confirmed' && <DropdownMenuItem>Mark as Completed</DropdownMenuItem>}
                           {(booking.status === 'confirmed' || booking.status === 'pending_payment') && 
@@ -344,7 +410,14 @@ export default function BookingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <BookingDetailsDialog
+        isOpen={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        bookingDetails={selectedBookingForDetails}
+        isLoading={isLoadingDetails}
+        error={detailsError}
+      />
     </div>
   );
 }
-
