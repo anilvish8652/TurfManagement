@@ -49,17 +49,14 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    // Use the proxy path defined in next.config.ts
-    const apiEndpoint = '/api-proxy/Auth/Login';
-    const requestHeaders: HeadersInit = {
+    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+    const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
+    const requestHeaders: HeadersInit = { // Added HeadersInit type for clarity
+      'accept': 'text/plain',
       'Content-Type': 'application/json',
-      // 'accept': 'text/plain', // Removed this header for simplification
     };
-
-    console.log("Attempting to login via proxy with username:", data.username);
-    console.log("Proxy API Endpoint:", apiEndpoint);
+    console.log("API Endpoint:", apiEndpoint);
     console.log("Request Headers:", requestHeaders);
-    // console.log("Request Body:", JSON.stringify({ username: data.username, password: data.password })); // Password logged for debugging only, remove in prod
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -72,19 +69,27 @@ export default function LoginPage() {
       console.log("Fetch response ok:", response.ok);
 
       if (response.ok) {
-        const result = await response.json().catch(async (jsonError) => {
-          console.warn("Failed to parse login response as JSON, trying as text. Error:", jsonError);
-          const textResponse = await response.text();
-          console.log("Login API Text Response (could not parse as JSON):", textResponse);
-          // Attempt to infer success if textResponse is just the token string. This is brittle.
-          if (typeof textResponse === 'string' && textResponse.startsWith('ey')) { // Basic check for JWT
-             return { token: textResponse, isValidUser: true, message: "Login successful (inferred from text token)." };
-          }
-          throw new Error("Login response was not valid JSON and could not be inferred as a token.");
-        });
+        // Try to parse as JSON, but if it fails (e.g. API returns plain text token), try to read as text.
+        let result;
+        const responseText = await response.text(); // Read as text first
+        try {
+            result = JSON.parse(responseText); // Try to parse as JSON
+        } catch (jsonError) {
+            // If JSON parsing fails, it might be a plain text token
+            // This logic assumes if it's not JSON and response was .ok, it's a plain text token.
+            // A more robust API would consistently return JSON or have a clear content-type.
+            console.warn("Could not parse login response as JSON. Assuming plain text token. Response text:", responseText);
+            // Basic check for JWT-like string
+            if (typeof responseText === 'string' && responseText.includes('.')) {
+                 result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token)." };
+            } else {
+                throw new Error("Login response was not valid JSON and could not be inferred as a token.");
+            }
+        }
         
         console.log("API Login Result (parsed):", result);
-        if (result.isValidUser && result.token) {
+
+        if (result && result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
           toast({
             title: "Login Successful",
@@ -99,7 +104,6 @@ export default function LoginPage() {
           });
         }
       } else {
-        // This block handles non-2xx responses, including 500
         let errorBody = "Could not read error body.";
         try {
             errorBody = await response.text(); 
@@ -107,9 +111,9 @@ export default function LoginPage() {
             if (errorBody.trim().startsWith('{') && errorBody.trim().endsWith('}')) {
               try {
                 const errorJson = JSON.parse(errorBody);
-                if (errorJson && errorJson.message) { // Check for a specific message property
+                if (errorJson && errorJson.message) { 
                   errorBody = errorJson.message;
-                } else if (typeof errorJson === 'object' && errorJson !== null) { // Fallback to stringifying the JSON
+                } else if (typeof errorJson === 'object' && errorJson !== null) { 
                   errorBody = JSON.stringify(errorJson);
                 }
               } catch (jsonParseError) {
@@ -122,7 +126,7 @@ export default function LoginPage() {
         console.error("Login API responded with an error:", response.status, errorBody);
         
         let toastDescription = `Server responded with ${response.status}.`;
-        const displayErrorBody = errorBody.length > 200 ? errorBody.substring(0, 200) + "..." : errorBody; // Limit length for toast
+        const displayErrorBody = errorBody.length > 200 ? errorBody.substring(0, 200) + "..." : errorBody; 
 
         if (response.status === 500) {
           toastDescription = `An internal server error occurred on the API (500). Please check the API server logs. (Details: ${displayErrorBody})`;
@@ -137,13 +141,13 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error("Login API request failed (e.g., network error, CORS if proxy misconfigured). Full error object:", error);
+      console.error("Login API request failed. Full error object:", error);
       let userMessage = "An unexpected error occurred during login. Please try again later.";
 
       if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
-        userMessage = "Network error: Could not connect to the API. This might be due to a network issue, the API server being unavailable, or a misconfiguration with the API proxy. Please check your internet connection and the browser console for more details.";
+        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. If this is a CORS issue, it must be resolved on the API server.";
         console.warn(
-          "A 'Failed to fetch' error occurred. Ensure the proxy in next.config.js is correctly configured and the target API server is running and accessible from the Next.js server environment."
+          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., http://localhost:xxxx) or use a proxy for development."
         );
       } else if (error instanceof Error) {
         userMessage = `Login error: ${error.message}`;
@@ -232,3 +236,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
