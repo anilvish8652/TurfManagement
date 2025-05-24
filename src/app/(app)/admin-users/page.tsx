@@ -87,7 +87,13 @@ export default function ReportsPage() {
         toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown network error fetching turfs.";
+      let msg = "Unknown network error fetching turfs. Check console for details.";
+      if (err instanceof Error) {
+          msg = err.message;
+          if (err.message.toLowerCase().includes('failed to fetch')) {
+              msg = "Network error fetching turfs. This could be a CORS issue or the API server being down. Please check the console.";
+          }
+      }
       console.error("Network or unexpected error fetching turfs:", err);
       setTurfListError(msg);
       toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
@@ -135,11 +141,13 @@ export default function ReportsPage() {
       'accept': '*/*',
     };
     
+    // Using /api-proxy/ for these calls as a workaround for potential CORS issues
     const endpoint = reportType === 'active'
-      ? 'https://api.classic7turf.com/Reports/GetActiveReports?page=1&pageSize=100'
-      : 'https://api.classic7turf.com/Reports/GetCancelledReports?page=1&pageSize=100';
+      ? '/api-proxy/Reports/GetActiveReports?page=1&pageSize=100'
+      : '/api-proxy/Reports/GetCancelledReports?page=1&pageSize=100';
 
     try {
+      console.log(`Fetching ${reportType} report from: ${endpoint} with body:`, JSON.stringify(requestBody));
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: headers,
@@ -154,9 +162,9 @@ export default function ReportsPage() {
         } catch (e) {
           // ignore if reading text fails
         }
-        console.error("Failed to fetch report:", errorBodyText);
+        console.error(`Failed to fetch ${reportType} report:`, errorBodyText);
         setReportError(`Server Error: ${response.status}. Check console for details.`);
-        toast({ title: "Failed to load report", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
+        toast({ title: `Failed to load ${reportType} report`, description: `Server responded with status ${response.status}. Please check console for more details. Error: ${errorBodyText.substring(0, 100)}...`, variant: "destructive" });
         setIsLoadingReport(false);
         return;
       }
@@ -168,15 +176,21 @@ export default function ReportsPage() {
           toast({ title: "No Data", description: "No report data found for the selected criteria." });
         }
       } else {
-        const msg = result.message || "Failed to process report data from API.";
+        const msg = result.message || `Failed to process ${reportType} report data from API.`;
         setReportError(msg);
-        toast({ title: "Failed to load report", description: msg, variant: "destructive" });
+        toast({ title: `Failed to load ${reportType} report`, description: msg, variant: "destructive" });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown network error fetching report.";
-      console.error("Network or unexpected error fetching report:", err);
+      let msg = `Unknown network error fetching ${reportType} report. Check console for details.`;
+       if (err instanceof Error) {
+          msg = err.message;
+          if (err.message.toLowerCase().includes('failed to fetch')) {
+              msg = `Network error fetching ${reportType} report. This could be a CORS issue, the API server being down, or the proxy not working. Please check the console.`;
+          }
+      }
+      console.error(`Network or unexpected error fetching ${reportType} report:`, err);
       setReportError(msg);
-      toast({ title: "Failed to load report", description: msg, variant: "destructive" });
+      toast({ title: `Failed to load ${reportType} report`, description: msg, variant: "destructive" });
     } finally {
       setIsLoadingReport(false);
     }
@@ -355,3 +369,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+
