@@ -49,13 +49,14 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
-    const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
-    const requestHeaders: HeadersInit = { // Added HeadersInit type for clarity
-      'accept': 'text/plain',
+    console.log("Attempting to login via proxy with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+    // Using the Next.js proxy path
+    const apiEndpoint = '/api-proxy/Auth/Login'; 
+    const requestHeaders: HeadersInit = {
+      'accept': 'text/plain', // Kept as per your working direct call example
       'Content-Type': 'application/json',
     };
-    console.log("API Endpoint:", apiEndpoint);
+    console.log("API Endpoint (via proxy):", apiEndpoint);
     console.log("Request Headers:", requestHeaders);
 
     try {
@@ -65,8 +66,8 @@ export default function LoginPage() {
         body: JSON.stringify({ username: data.username, password: data.password }),
       });
 
-      console.log("Fetch response status:", response.status);
-      console.log("Fetch response ok:", response.ok);
+      console.log("Proxy fetch response status:", response.status);
+      console.log("Proxy fetch response ok:", response.ok);
 
       if (response.ok) {
         // Try to parse as JSON, but if it fails (e.g. API returns plain text token), try to read as text.
@@ -76,17 +77,15 @@ export default function LoginPage() {
             result = JSON.parse(responseText); // Try to parse as JSON
         } catch (jsonError) {
             // If JSON parsing fails, it might be a plain text token
-            console.warn("Could not parse login response as JSON. Assuming plain text token. Response text:", responseText);
-            // Basic check for JWT-like string (contains dots, is a string)
-            if (typeof responseText === 'string' && responseText.includes('.')) {
-                 result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token)." };
+            console.warn("Could not parse login response as JSON. Assuming plain text token from proxy. Response text:", responseText);
+            if (typeof responseText === 'string' && responseText.includes('.')) { // Basic check for JWT-like string
+                 result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token via proxy)." };
             } else {
-                // If it's not JSON and doesn't look like a token, but response was ok, it's an unexpected success format
-                throw new Error("Login response was successful but not valid JSON and could not be inferred as a token.");
+                throw new Error("Login response via proxy was successful but not valid JSON and could not be inferred as a token.");
             }
         }
         
-        console.log("API Login Result (parsed):", result);
+        console.log("API Login Result (via proxy):", result);
 
         if (result && result.isValidUser && result.token) {
           localStorage.setItem('authToken', result.token);
@@ -98,12 +97,12 @@ export default function LoginPage() {
         } else {
           toast({
             title: "Login Failed",
-            description: result.message || "Invalid username or password, or user not valid.",
+            description: result.message || "Invalid username or password, or user not valid (via proxy).",
             variant: "destructive",
           });
         }
       } else {
-        let errorBody = "Could not read error body.";
+        let errorBody = "Could not read error body from proxy response.";
         try {
             errorBody = await response.text(); 
             // Attempt to parse if it looks like JSON, otherwise use the text
@@ -113,29 +112,25 @@ export default function LoginPage() {
                 if (errorJson && errorJson.message) { 
                   errorBody = errorJson.message;
                 } else if (typeof errorJson === 'object' && errorJson !== null) { 
-                  // If it's an object but no message field, stringify it
                   errorBody = JSON.stringify(errorJson);
                 }
               } catch (jsonParseError) {
-                console.warn("Could not parse error body as JSON, using raw text:", jsonParseError);
+                console.warn("Could not parse error body from proxy as JSON, using raw text:", jsonParseError);
               }
             }
         } catch (e) {
-            console.error("Failed to read error body as text:", e);
+            console.error("Failed to read error body from proxy as text:", e);
         }
-        console.error("Login API responded with an error:", response.status, errorBody);
+        console.error("Login API (via proxy) responded with an error:", response.status, errorBody);
         
-        let toastDescription = `Server responded with ${response.status}.`;
-        // Ensure errorBody is concise for the toast
+        let toastDescription = `Server responded with ${response.status} (via proxy).`;
         const displayErrorBody = errorBody.length > 150 ? errorBody.substring(0, 150) + "..." : errorBody; 
 
         if (response.status === 500) {
-          toastDescription = `An internal server error occurred on the API (500). Please check the API server logs. (Details: ${displayErrorBody})`;
+          toastDescription = `An internal server error occurred on the API (500 via proxy). Please check the API server logs. (Details: ${displayErrorBody})`;
         } else if (displayErrorBody && !displayErrorBody.toLowerCase().includes("internal server error")) { 
-            // Avoid duplicating "internal server error" if it's already in a generic errorBody
             toastDescription += ` ${displayErrorBody}`;
         }
-
 
         toast({
           title: "Login Failed",
@@ -144,16 +139,17 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error("Login API request failed. Full error object:", error);
-      let userMessage = "An unexpected error occurred during login. Please try again later.";
+      console.error("Login API request (via proxy) failed. Full error object:", error);
+      let userMessage = "An unexpected error occurred during login (via proxy). Please try again later.";
 
       if (error instanceof TypeError && (error.message.toLowerCase().includes('failed to fetch') || error.message.toLowerCase().includes('networkerror'))) {
-        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. If this is a CORS issue, it must be resolved on the API server.";
+        // This error message might now refer to the Next.js dev server if the proxy itself fails
+        userMessage = "Network error: Failed to fetch the login API via proxy. This could be due to a network issue, the API server being unavailable, or the proxy configuration. Please check your internet connection, the Next.js server console, and the browser console for more details.";
         console.warn(
-          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., http://localhost:xxxx) or use a proxy for development."
+          "A 'Failed to fetch' error occurred when using the proxy. This might mean the Next.js dev server couldn't reach https://api.classic7turf.com. Check the Next.js server console for errors related to the proxy destination."
         );
       } else if (error instanceof Error) {
-        userMessage = `Login error: ${error.message}`;
+        userMessage = `Login error (via proxy): ${error.message}`;
       }
       
       toast({
