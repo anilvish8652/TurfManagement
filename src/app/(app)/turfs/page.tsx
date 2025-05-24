@@ -35,7 +35,7 @@ export default function TurfsPage() {
     }
 
     try {
-      const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', { // Using proxy
+      const response = await fetch('https://api.classic7turf.com/Turf/GetTurfList?page=1&pageSize=100', {
         method: 'GET',
         headers: {
           'accept': '*/*',
@@ -44,18 +44,8 @@ export default function TurfsPage() {
       });
 
       if (!response.ok) {
-        let errorBody = `API Error: ${response.status}`;
-        try {
-          const text = await response.text();
-          errorBody += ` - ${text || response.statusText}`;
-        } catch (e) {
-          // ignore if reading text fails
-        }
-        console.error("Failed to fetch turfs:", errorBody);
-        setError(`Server Error: ${response.status}. Check console for details.`);
-        toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
-        setIsLoading(false);
-        return;
+        const errorData = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorData || response.statusText}`);
       }
 
       const result: ApiTurfListResponse = await response.json();
@@ -75,24 +65,26 @@ export default function TurfsPage() {
             turfContactNo: item.turfContactNo || undefined,
             turfEmail: item.turfEmail || undefined,
             rawImage: item.turfImage || undefined,
-            images: [item.turfImage || `https://placehold.co/100x80.png`],
+            images: [item.turfImage || `https://placehold.co/100x80.png?text=${item.turfName.substring(0,2)}`],
             status: 'available', // Default status as API doesn't provide it
           };
         });
         setTurfs(transformedTurfs);
-        if (transformedTurfs.length === 0) {
+         if (transformedTurfs.length === 0) {
           toast({ title: "No Turfs Found", description: "The API returned an empty list of turfs." });
         }
       } else {
-        const msg = result.message || "Failed to process turfs data from API.";
-        setError(msg);
-        toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
+        throw new Error(result.message || "Failed to fetch turfs: API request was not successful.");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown network error fetching turfs.";
-      console.error("Network or unexpected error fetching turfs:", err);
-      setError(msg);
-      toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while fetching turfs.";
+      setError(errorMessage);
+      toast({
+        title: "Failed to load turfs",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error("Fetch turfs error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +121,7 @@ export default function TurfsPage() {
               <p>Error loading turfs: {error}</p>
               <Button variant="outline" onClick={fetchTurfsData} className="mt-4">Try Again</Button>
             </div>
-          ) : turfs.length === 0 && !isLoading ? ( // Added !isLoading to prevent showing "No turfs found" during initial load
+          ) : turfs.length === 0 && !isLoading ? (
              <div className="text-center py-10 text-muted-foreground">
               <p>No turfs found. You can add a new turf to get started.</p>
                <Button asChild className="mt-4">
@@ -157,9 +149,9 @@ export default function TurfsPage() {
                         alt={turf.name}
                         className="aspect-square rounded-md object-cover"
                         height={64}
-                        src={turf.images[0]}
+                        src={turf.images[0]} // This uses the potentially placeholder image
                         width={64}
-                        data-ai-hint={turf.turfType ? turf.turfType.toLowerCase().split(' ')[0] : "sports field"} // Use first word of type
+                        data-ai-hint={turf.turfType ? turf.turfType.toLowerCase().split(' ')[0] : "sports field"}
                         unoptimized={turf.images[0].startsWith('https://placehold.co')}
                       />
                     </TableCell>
@@ -202,3 +194,4 @@ export default function TurfsPage() {
     </div>
   );
 }
+    
