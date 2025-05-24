@@ -29,8 +29,14 @@ import type { Booking, UpdateBookingPayload } from '@/types';
 import { toast } from '@/hooks/use-toast';
 
 const updateBookingFormSchema = z.object({
-  newPaymentAmount: z.string().regex(/^\d*\.?\d*$/, "Invalid amount").min(0, "Amount cannot be negative"),
-  discountAmount: z.string().regex(/^\d*\.?\d*$/, "Invalid amount").default("0").min(0, "Discount cannot be negative"),
+  newPaymentAmount: z.string()
+    .min(1, { message: "Amount is required." }) // Check for non-empty string
+    .regex(/^\d*\.?\d*$/, { message: "Invalid amount format. Must be a number (e.g., 500 or 500.50)." })
+    .refine(val => parseFloat(val) >= 0, { message: "Amount cannot be negative." }),
+  discountAmount: z.string()
+    .regex(/^\d*\.?\d*$/, { message: "Invalid amount format. Must be a number (e.g., 100 or 100.50)." })
+    .default("0")
+    .refine(val => parseFloat(val) >= 0, { message: "Discount cannot be negative." }),
   paymentMode: z.string().min(1, 'Payment mode is required'),
   transactionID: z.string().min(1, 'Transaction ID or reference is required'),
 });
@@ -84,7 +90,7 @@ export function UpdateBookingDialog({
       paymentMode: values.paymentMode,
       transactionID: values.transactionID,
       advanceAmount: parseFloat(values.newPaymentAmount).toFixed(2),
-      discountAmount: parseFloat(values.discountAmount).toFixed(2),
+      discountAmount: parseFloat(values.discountAmount).toFixed(2), // discountAmount is already defaulted to "0" or user-provided
       finalAmount: booking.totalPrice.toFixed(2), // Original total price
     };
     await onSubmitApi(payload);
@@ -181,3 +187,4 @@ export function UpdateBookingDialog({
     </Dialog>
   );
 }
+
