@@ -26,9 +26,9 @@ export default function ReportsPage() {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
 
-  const [reportData, setReportData] = useState<ApiBookingReportItem[]>([]);
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
+  const [apiReportData, setApiReportData] = useState<ApiBookingReportItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize dates on client side to avoid hydration issues
   useEffect(() => {
@@ -107,21 +107,21 @@ export default function ReportsPage() {
   }, [fetchTurfsForSelect]);
 
 
-  const fetchReportData = useCallback(async () => {
+  const fetchBookings = useCallback(async () => {
     if (!selectedTurfId || !fromDate || !toDate) {
       toast({ title: "Missing Filters", description: "Please select a turf and date range.", variant: "destructive" });
-      setReportData([]);
+      setApiReportData([]);
       return;
     }
 
-    setIsLoadingReport(true);
-    setReportError(null);
-    setReportData([]);
+    setIsLoading(true);
+    setError(null);
+    setApiReportData([]);
     const token = localStorage.getItem('authToken');
     if (!token) {
       const msg = "Authentication token not found. Please login.";
-      setReportError(msg);
-      setIsLoadingReport(false);
+      setError(msg);
+      setIsLoading(false);
       toast({ title: "Authentication Error", description: msg, variant: "destructive" });
       return;
     }
@@ -141,10 +141,9 @@ export default function ReportsPage() {
       'accept': '*/*',
     };
     
-    // Using /api-proxy/ for these calls as a workaround for potential CORS issues
     const endpoint = reportType === 'active'
-      ? '/api-proxy/Reports/GetActiveReports?page=1&pageSize=100'
-      : '/api-proxy/Reports/GetCancelledReports?page=1&pageSize=100';
+      ? 'https://api.classic7turf.com/Reports/GetActiveReports?page=1&pageSize=100'
+      : 'https://api.classic7turf.com/Reports/GetCancelledReports?page=1&pageSize=100';
 
     try {
       console.log(`Fetching ${reportType} report from: ${endpoint} with body:`, JSON.stringify(requestBody));
@@ -163,21 +162,21 @@ export default function ReportsPage() {
           // ignore if reading text fails
         }
         console.error(`Failed to fetch ${reportType} report:`, errorBodyText);
-        setReportError(`Server Error: ${response.status}. Check console for details.`);
+        setError(`Server Error: ${response.status}. Check console for details.`);
         toast({ title: `Failed to load ${reportType} report`, description: `Server responded with status ${response.status}. Please check console for more details. Error: ${errorBodyText.substring(0, 100)}...`, variant: "destructive" });
-        setIsLoadingReport(false);
+        setIsLoading(false);
         return;
       }
       const result: ApiBookingReportResponse = await response.json();
 
       if (result.success && result.data) {
-        setReportData(result.data);
+        setApiReportData(result.data);
         if (result.data.length === 0) {
           toast({ title: "No Data", description: "No report data found for the selected criteria." });
         }
       } else {
         const msg = result.message || `Failed to process ${reportType} report data from API.`;
-        setReportError(msg);
+        setError(msg);
         toast({ title: `Failed to load ${reportType} report`, description: msg, variant: "destructive" });
       }
     } catch (err) {
@@ -185,14 +184,14 @@ export default function ReportsPage() {
        if (err instanceof Error) {
           msg = err.message;
           if (err.message.toLowerCase().includes('failed to fetch')) {
-              msg = `Network error fetching ${reportType} report. This could be a CORS issue, the API server being down, or the proxy not working. Please check the console.`;
+              msg = `Network error fetching ${reportType} report. This could be a CORS issue or the API server being down. Please check the console.`;
           }
       }
       console.error(`Network or unexpected error fetching ${reportType} report:`, err);
-      setReportError(msg);
+      setError(msg);
       toast({ title: `Failed to load ${reportType} report`, description: msg, variant: "destructive" });
     } finally {
-      setIsLoadingReport(false);
+      setIsLoading(false);
     }
   }, [reportType, selectedTurfId, fromDate, toDate]);
 
@@ -202,10 +201,11 @@ export default function ReportsPage() {
     if (reportType === 'cancelled') {
       return { text: "Cancelled", variant: "destructive" };
     }
+    // For active reports
     if (item.paymentStatus?.toLowerCase() === 'done') {
       return { text: "Active", variant: "default" };
     }
-    return { text: "Pending", variant: "outline" };
+    return { text: "Pending", variant: "outline" }; // Default for other statuses in active report
   };
 
   return (
@@ -283,21 +283,21 @@ export default function ReportsPage() {
           </div>
         </CardContent>
         <CardContent className="flex justify-end pt-0">
-          <Button onClick={fetchReportData} disabled={isLoadingReport || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>
-            {isLoadingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSearch className="mr-2 h-4 w-4" />}
+          <Button onClick={fetchBookings} disabled={isLoading || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSearch className="mr-2 h-4 w-4" />}
             Fetch Report
           </Button>
         </CardContent>
       </Card>
 
-      {reportError && !isLoadingReport && (
+      {error && !isLoading && (
         <Card className="border-destructive">
           <CardHeader>
             <CardTitle className="text-destructive">Error Loading Report</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>{reportError}</p>
-            <Button variant="outline" onClick={fetchReportData} className="mt-2"  disabled={isLoadingReport || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>Try Again</Button>
+            <p>{error}</p>
+            <Button variant="outline" onClick={fetchBookings} className="mt-2"  disabled={isLoading || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>Try Again</Button>
           </CardContent>
         </Card>
       )}
@@ -311,14 +311,14 @@ export default function ReportsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingReport ? (
+          {isLoading ? (
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="ml-2">Loading report data...</p>
             </div>
-          ) : !reportError && reportData.length === 0 && !isLoadingReport ? (
+          ) : !error && apiReportData.length === 0 && !isLoading ? (
             <p className="text-muted-foreground text-center py-10">No data to display. Please fetch a report using the filters above.</p>
-          ) : reportData.length > 0 ? (
+          ) : apiReportData.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -335,7 +335,7 @@ export default function ReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportData.map((item) => {
+                {apiReportData.map((item) => {
                   const bookingStatus = getBookingStatus(item);
                   return (
                     <TableRow key={item.bookingID}>
@@ -369,4 +369,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
