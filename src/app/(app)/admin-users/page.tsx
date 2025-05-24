@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Loader2, CalendarIcon, FileSearch } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 type ReportType = 'active' | 'cancelled';
 
@@ -59,8 +60,14 @@ export default function ReportsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Failed to fetch turfs API Error:", response.status, errorData);
+        let errorBodyText = `API Error: ${response.status}`;
+        try {
+          const text = await response.text();
+          errorBodyText += ` - ${text || response.statusText}`;
+        } catch (e) {
+          // ignore if reading text fails
+        }
+        console.error("Failed to fetch turfs API Error:", errorBodyText);
         setTurfListError(`Server Error: ${response.status}. Check console for details.`);
         toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
         setIsLoadingTurfs(false);
@@ -176,6 +183,16 @@ export default function ReportsPage() {
   }, [reportType, selectedTurfId, fromDate, toDate]);
 
   const todayForCalendar = new Date();
+
+  const getBookingStatus = (item: ApiBookingReportItem): { text: string, variant: "default" | "secondary" | "destructive" | "outline" } => {
+    if (reportType === 'cancelled') {
+      return { text: "Cancelled", variant: "destructive" };
+    }
+    if (item.paymentStatus?.toLowerCase() === 'done') {
+      return { text: "Active", variant: "default" };
+    }
+    return { text: "Pending", variant: "outline" };
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -300,22 +317,36 @@ export default function ReportsPage() {
                   <TableHead>Balance</TableHead>
                   <TableHead>Discount</TableHead>
                   <TableHead>Payment Status</TableHead>
+                  <TableHead>Booking Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportData.map((item) => (
-                  <TableRow key={item.bookingID}>
-                    <TableCell className="font-medium">{item.bookingID}</TableCell>
-                    <TableCell>{item.turfBooked}</TableCell>
-                    <TableCell>{item.bookingPersonName}</TableCell>
-                    <TableCell>{item.bookingDate}</TableCell>
-                    <TableCell>{item.bookingSlots}</TableCell>
-                    <TableCell>₹{parseFloat(item.amount).toFixed(2)}</TableCell>
-                    <TableCell>₹{parseFloat(item.balanceAmount).toFixed(2)}</TableCell>
-                    <TableCell>₹{parseFloat(item.discountAmount || "0").toFixed(2)}</TableCell>
-                    <TableCell>{item.paymentStatus}</TableCell>
-                  </TableRow>
-                ))}
+                {reportData.map((item) => {
+                  const bookingStatus = getBookingStatus(item);
+                  return (
+                    <TableRow key={item.bookingID}>
+                      <TableCell className="font-medium">{item.bookingID}</TableCell>
+                      <TableCell>{item.turfBooked}</TableCell>
+                      <TableCell>{item.bookingPersonName}</TableCell>
+                      <TableCell>{item.bookingDate}</TableCell>
+                      <TableCell>{item.bookingSlots}</TableCell>
+                      <TableCell>₹{parseFloat(item.amount).toFixed(2)}</TableCell>
+                      <TableCell>₹{parseFloat(item.balanceAmount).toFixed(2)}</TableCell>
+                      <TableCell>₹{parseFloat(item.discountAmount || "0").toFixed(2)}</TableCell>
+                      <TableCell>{item.paymentStatus}</TableCell>
+                      <TableCell>
+                        <Badge variant={bookingStatus.variant} 
+                          className={
+                            bookingStatus.variant === 'default' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300 dark:border-green-700' :
+                            bookingStatus.variant === 'outline' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700' : ''
+                          }
+                        >
+                          {bookingStatus.text}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : null}
@@ -324,5 +355,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
