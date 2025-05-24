@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
-import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, ApiBookingDetailsResponse, PaymentDetail } from "@/types";
+import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, PaymentDetail, UpdateBookingPayload } from "@/types";
 import Link from "next/link";
-import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -16,6 +16,7 @@ import { format, parse } from "date-fns";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { BookingDetailsDialog } from "@/components/booking/BookingDetailsDialog";
+import { UpdateBookingDialog } from "@/components/booking/UpdateBookingDialog";
 
 
 const parseBookingDateTime = (apiBookingDate: string, apiBookingSlots: string): { startTime: Date, endTime: Date, bookedAt: Date } => {
@@ -61,6 +62,7 @@ const transformApiReportItemToBooking = (item: ApiBookingReportItem, type: 'acti
     totalPrice: parseFloat(item.amount),
     bookedAt,
     paymentStatusApi: item.paymentStatus,
+    discountAmount: parseFloat(item.discountAmount || "0"),
   };
 };
 
@@ -80,6 +82,10 @@ export default function BookingsPage() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+
+  const [selectedBookingForUpdate, setSelectedBookingForUpdate] = useState<Booking | null>(null);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isUpdatingBooking, setIsUpdatingBooking] = useState(false);
 
 
   const fetchBookingReports = useCallback(async (turfID: string, fromDate: Date, toDate: Date) => {
@@ -247,6 +253,67 @@ export default function BookingsPage() {
     }
   };
 
+  const handleOpenUpdateDialog = (booking: Booking) => {
+    setSelectedBookingForUpdate(booking);
+    setIsUpdateDialogOpen(true);
+  };
+
+  const handleUpdateBookingApi = async (payload: UpdateBookingPayload) => {
+    setIsUpdatingBooking(true);
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      toast({ title: "Authentication Error", description: "Token not found.", variant: "destructive" });
+      setIsUpdatingBooking(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.classic7turf.com/Turf/UpdateBooking', {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resultText = await response.text(); // API seems to return plain text for success
+      
+      if (!response.ok) {
+        // Try to parse as JSON if it's an error object, otherwise use text
+        let errorMessage = resultText;
+        try {
+          const errorJson = JSON.parse(resultText);
+          errorMessage = errorJson.message || resultText;
+        } catch (e) {
+          // It wasn't JSON, use the text itself
+        }
+        throw new Error(errorMessage || `API Error: ${response.status}`);
+      }
+
+      // Assuming successful update if response.ok is true, as the success response is plain text
+      toast({
+        title: "Booking Updated!",
+        description: resultText || "Booking has been successfully updated.",
+      });
+      setIsUpdateDialogOpen(false);
+      if (filterTurfId && filterFromDate && filterToDate) {
+        fetchBookingReports(filterTurfId, filterFromDate, filterToDate); // Refresh list
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during update.";
+      toast({
+        title: "Update Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error("Update booking error:", error);
+    } finally {
+      setIsUpdatingBooking(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -396,7 +463,11 @@ export default function BookingsPage() {
                           <DropdownMenuItem onClick={() => handleViewDetails(booking.id)}>
                             View Details
                           </DropdownMenuItem>
-                          {booking.status === 'pending_payment' && <DropdownMenuItem>Mark as Confirmed</DropdownMenuItem>}
+                          {booking.status === 'pending_payment' && (
+                            <DropdownMenuItem onClick={() => handleOpenUpdateDialog(booking)} className="flex items-center">
+                                <Edit className="mr-2 h-4 w-4" /> Update Booking
+                            </DropdownMenuItem>
+                          )}
                           {booking.status === 'confirmed' && <DropdownMenuItem>Mark as Completed</DropdownMenuItem>}
                           {(booking.status === 'confirmed' || booking.status === 'pending_payment') && 
                             <DropdownMenuItem className="text-destructive hover:text-destructive focus:text-destructive">Cancel Booking</DropdownMenuItem>}
@@ -418,6 +489,15 @@ export default function BookingsPage() {
         isLoading={isLoadingDetails}
         error={detailsError}
       />
+      {selectedBookingForUpdate && (
+        <UpdateBookingDialog
+            isOpen={isUpdateDialogOpen}
+            onOpenChange={setIsUpdateDialogOpen}
+            booking={selectedBookingForUpdate}
+            onSubmitApi={handleUpdateBookingApi}
+            isLoading={isUpdatingBooking}
+        />
+      )}
     </div>
   );
 }

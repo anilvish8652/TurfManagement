@@ -40,6 +40,7 @@ export interface Booking {
   totalPrice: number; // amount from API
   bookedAt: Date; // Parsed from bookingDate (date part only)
   paymentStatusApi?: string; // Raw paymentStatus from API
+  discountAmount?: number; // Optional, for update payload
 }
 
 export interface User {
@@ -200,4 +201,14 @@ export interface ApiBookingDetailsResponse {
   orderby: string;
   orderbydesc: boolean;
   data: ApiBookingDetailItem[]; // Expecting an array with one item
+}
+
+// Payload for UpdateBooking API
+export interface UpdateBookingPayload {
+  bookingID: string;
+  paymentMode: string;
+  transactionID: string;
+  advanceAmount: string; // Amount being paid now
+  discountAmount: string; // Total discount
+  finalAmount: string; // Original total price
 }
