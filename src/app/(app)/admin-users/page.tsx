@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import type { ApiBookingReportItem, ApiBookingReportResponse, ApiTurfListItem, ApiTurfListResponse } from "@/types"; // Turf type for selectedTurf
+import type { ApiBookingReportItem, ApiBookingReportResponse, ApiTurfListItem, ApiTurfListResponse } from "@/types";
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Loader2, CalendarIcon, FileSearch } from "lucide-react";
@@ -22,66 +22,83 @@ export default function ReportsPage() {
   const [isLoadingTurfs, setIsLoadingTurfs] = useState(true);
   const [turfListError, setTurfListError] = useState<string | null>(null);
 
-  const [fromDate, setFromDate] = useState<Date | undefined>(() => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1); // Default to first day of current month
-  });
-  const [toDate, setToDate] = useState<Date | undefined>(new Date()); // Default to today
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
 
   const [reportData, setReportData] = useState<ApiBookingReportItem[]>([]);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+
+  // Initialize dates on client side to avoid hydration issues
+  useEffect(() => {
+    const today = new Date();
+    setFromDate(new Date(today.getFullYear(), today.getMonth(), 1)); // Default to first day of current month
+    setToDate(new Date()); // Default to today
+  }, []);
+
 
   const fetchTurfsForSelect = useCallback(async () => {
     setIsLoadingTurfs(true);
     setTurfListError(null);
     const token = localStorage.getItem('authToken');
     if (!token) {
-      setTurfListError("Authentication token not found.");
+      const msg = "Authentication token not found. Please login.";
+      setTurfListError(msg);
       setIsLoadingTurfs(false);
-      toast({ title: "Authentication Error", description: "Token not found for fetching turfs.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: msg, variant: "destructive" });
       return;
     }
 
     try {
       const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', {
         method: 'GET',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'accept': '*/*',
         },
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error fetching turfs: ${response.status} - ${errorText || response.statusText}`);
+        let errorBody = `API Error: ${response.status}`;
+        try {
+          const text = await response.text();
+          errorBody += ` - ${text || response.statusText}`;
+        } catch (e) {
+          // ignore if reading text fails
+        }
+        console.error("Failed to fetch turfs:", errorBody);
+        setTurfListError(`Server Error: ${response.status}. Check console for details.`);
+        toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
+        setIsLoadingTurfs(false);
+        return;
       }
       const result: ApiTurfListResponse = await response.json();
 
       if (result.success && result.data) {
-        // Using ApiTurfListItem structure directly for simplicity if only id and name are needed for the state
         const transformedTurfs = result.data.map(apiTurf => ({ turfID: apiTurf.turfID, turfName: apiTurf.turfName }));
         setTurfsForSelect(transformedTurfs);
       } else {
-        throw new Error(result.message || "Failed to fetch turfs for selection.");
+        const msg = result.message || "Failed to process turfs data from API.";
+        setTurfListError(msg);
+        toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error fetching turfs.";
+      const msg = err instanceof Error ? err.message : "Unknown network error fetching turfs.";
+      console.error("Network or unexpected error fetching turfs:", err);
       setTurfListError(msg);
       toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
     } finally {
       setIsLoadingTurfs(false);
     }
-  }, []); // Removed selectedTurfId dependency
+  }, []);
 
   useEffect(() => {
     fetchTurfsForSelect();
   }, [fetchTurfsForSelect]);
 
   useEffect(() => {
-    // Auto-select the first turf when the list loads and no turf is currently selected
     if (turfsForSelect.length > 0 && !selectedTurfId) {
-        setSelectedTurfId(turfsForSelect[0].turfID);
+      setSelectedTurfId(turfsForSelect[0].turfID);
     }
   }, [turfsForSelect, selectedTurfId]);
 
@@ -95,12 +112,13 @@ export default function ReportsPage() {
 
     setIsLoadingReport(true);
     setReportError(null);
-    setReportData([]); // Clear previous report data
+    setReportData([]);
     const token = localStorage.getItem('authToken');
     if (!token) {
-      setReportError("Authentication token not found.");
+      const msg = "Authentication token not found. Please login.";
+      setReportError(msg);
       setIsLoadingReport(false);
-      toast({ title: "Authentication Error", description: "Token not found for fetching report.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: msg, variant: "destructive" });
       return;
     }
 
@@ -126,29 +144,42 @@ export default function ReportsPage() {
       });
 
       if (!response.ok) {
-         const errorText = await response.text();
-         throw new Error(`API Error fetching report: ${response.status} - ${errorText || response.statusText}`);
+        let errorBody = `API Error: ${response.status}`;
+        try {
+          const text = await response.text();
+          errorBody += ` - ${text || response.statusText}`;
+        } catch (e) {
+          // ignore
+        }
+        console.error("Failed to fetch report:", errorBody);
+        setReportError(`Server Error: ${response.status}. Check console for details.`);
+        toast({ title: "Failed to load report", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
+        setIsLoadingReport(false);
+        return;
       }
       const result: ApiBookingReportResponse = await response.json();
 
       if (result.success && result.data) {
         setReportData(result.data);
         if (result.data.length === 0) {
-            toast({ title: "No Data", description: "No report data found for the selected criteria."});
+          toast({ title: "No Data", description: "No report data found for the selected criteria." });
         }
       } else {
-        throw new Error(result.message || "Failed to fetch report data.");
+        const msg = result.message || "Failed to process report data from API.";
+        setReportError(msg);
+        toast({ title: "Failed to load report", description: msg, variant: "destructive" });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error fetching report.";
+      const msg = err instanceof Error ? err.message : "Unknown network error fetching report.";
+      console.error("Network or unexpected error fetching report:", err);
       setReportError(msg);
       toast({ title: "Failed to load report", description: msg, variant: "destructive" });
     } finally {
       setIsLoadingReport(false);
     }
   }, [reportType, selectedTurfId, fromDate, toDate]);
-  
-  const today = new Date();
+
+  const todayForCalendar = new Date();
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,7 +206,7 @@ export default function ReportsPage() {
 
           <div>
             <label htmlFor="turfFilter" className="block text-sm font-medium text-muted-foreground mb-1">Filter by Turf</label>
-            {isLoadingTurfs ? <Loader2 className="h-5 w-5 animate-spin" /> : turfListError ? <p className="text-destructive text-xs">{turfListError}</p> : (
+            {isLoadingTurfs ? <div className="flex items-center h-10"><Loader2 className="h-5 w-5 animate-spin" /> <span className="ml-2 text-sm">Loading turfs...</span></div> : turfListError ? <p className="text-destructive text-xs pt-2">{turfListError}</p> : (
               <Select value={selectedTurfId} onValueChange={setSelectedTurfId} disabled={turfsForSelect.length === 0}>
                 <SelectTrigger id="turfFilter">
                   <SelectValue placeholder="Select a turf" />
@@ -184,6 +215,7 @@ export default function ReportsPage() {
                   {turfsForSelect.map((turf) => (
                     <SelectItem key={turf.turfID} value={turf.turfID}>{turf.turfName}</SelectItem>
                   ))}
+                   {turfsForSelect.length === 0 && <p className="p-2 text-sm text-muted-foreground">No turfs found.</p>}
                 </SelectContent>
               </Select>
             )}
@@ -191,50 +223,54 @@ export default function ReportsPage() {
 
           <div>
             <label htmlFor="fromDate" className="block text-sm font-medium text-muted-foreground mb-1">From Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button id="fromDate" variant="outline" className="w-full justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {fromDate ? format(fromDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={fromDate} onSelect={setFromDate} disabled={(date) => date > (toDate || today) || date > today} initialFocus />
-              </PopoverContent>
-            </Popover>
+            {fromDate === undefined ? <div className="h-10 flex items-center"><Loader2 className="h-5 w-5 animate-spin" /></div> : (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button id="fromDate" variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {fromDate ? format(fromDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={fromDate} onSelect={setFromDate} disabled={(date) => date > (toDate || todayForCalendar) || date > todayForCalendar} initialFocus />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
-          
+
           <div>
             <label htmlFor="toDate" className="block text-sm font-medium text-muted-foreground mb-1">To Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button id="toDate" variant="outline" className="w-full justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {toDate ? format(toDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={toDate} onSelect={setToDate} disabled={(date) => date < (fromDate || new Date(0)) || date > today} initialFocus />
-              </PopoverContent>
-            </Popover>
+             {toDate === undefined ? <div className="h-10 flex items-center"><Loader2 className="h-5 w-5 animate-spin" /></div> : (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button id="toDate" variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {toDate ? format(toDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={toDate} onSelect={setToDate} disabled={(date) => date < (fromDate || new Date(0)) || date > todayForCalendar} initialFocus />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </CardContent>
         <CardContent className="flex justify-end pt-0">
-            <Button onClick={fetchReportData} disabled={isLoadingReport || !selectedTurfId || !fromDate || !toDate}>
+          <Button onClick={fetchReportData} disabled={isLoadingReport || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>
             {isLoadingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSearch className="mr-2 h-4 w-4" />}
             Fetch Report
           </Button>
         </CardContent>
       </Card>
 
-      {reportError && (
+      {reportError && !isLoadingReport && (
         <Card className="border-destructive">
           <CardHeader>
             <CardTitle className="text-destructive">Error Loading Report</CardTitle>
           </CardHeader>
           <CardContent>
             <p>{reportError}</p>
-            <Button variant="outline" onClick={fetchReportData} className="mt-2">Try Again</Button>
+            <Button variant="outline" onClick={fetchReportData} className="mt-2"  disabled={isLoadingReport || !selectedTurfId || !fromDate || !toDate || isLoadingTurfs}>Try Again</Button>
           </CardContent>
         </Card>
       )}
@@ -276,7 +312,7 @@ export default function ReportsPage() {
                     <TableCell className="font-medium">{item.bookingID}</TableCell>
                     <TableCell>{item.turfBooked}</TableCell>
                     <TableCell>{item.bookingPersonName}</TableCell>
-                    <TableCell>{item.bookingDate}</TableCell> 
+                    <TableCell>{item.bookingDate}</TableCell>
                     <TableCell>{item.bookingSlots}</TableCell>
                     <TableCell>₹{parseFloat(item.amount).toFixed(2)}</TableCell>
                     <TableCell>₹{parseFloat(item.balanceAmount).toFixed(2)}</TableCell>
@@ -292,5 +328,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
