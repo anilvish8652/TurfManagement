@@ -50,23 +50,19 @@ export default function ReportsPage() {
     }
 
     try {
-      const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', {
+      // Using direct API call as per user's working example
+      const response = await fetch('https://api.classic7turf.com/Turf/GetTurfList?page=1&pageSize=100', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
-        let errorBody = `API Error: ${response.status}`;
-        try {
-          const text = await response.text();
-          errorBody += ` - ${text || response.statusText}`;
-        } catch (e) {
-          // ignore if reading text fails
-        }
-        console.error("Failed to fetch turfs:", errorBody);
+        const errorData = await response.text();
+        // Log the full error for easier debugging in console
+        console.error("Failed to fetch turfs API Error:", response.status, errorData);
         setTurfListError(`Server Error: ${response.status}. Check console for details.`);
         toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
         setIsLoadingTurfs(false);
@@ -77,6 +73,11 @@ export default function ReportsPage() {
       if (result.success && result.data) {
         const transformedTurfs = result.data.map(apiTurf => ({ turfID: apiTurf.turfID, turfName: apiTurf.turfName }));
         setTurfsForSelect(transformedTurfs);
+        if (transformedTurfs.length > 0 && !selectedTurfId) {
+          // Auto-select the first turf if none is selected
+          // This line was previously missing the check for !selectedTurfId which could cause re-selection
+          setSelectedTurfId(transformedTurfs[0].turfID);
+        }
       } else {
         const msg = result.message || "Failed to process turfs data from API.";
         setTurfListError(msg);
@@ -90,17 +91,11 @@ export default function ReportsPage() {
     } finally {
       setIsLoadingTurfs(false);
     }
-  }, []);
+  }, [selectedTurfId]); // Added selectedTurfId as dependency to ensure re-fetch doesn't clear selection unnecessarily if logic changes
 
   useEffect(() => {
     fetchTurfsForSelect();
   }, [fetchTurfsForSelect]);
-
-  useEffect(() => {
-    if (turfsForSelect.length > 0 && !selectedTurfId) {
-      setSelectedTurfId(turfsForSelect[0].turfID);
-    }
-  }, [turfsForSelect, selectedTurfId]);
 
 
   const fetchReportData = useCallback(async () => {
