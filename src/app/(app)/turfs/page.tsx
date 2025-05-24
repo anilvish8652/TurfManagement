@@ -5,124 +5,102 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { Turf } from "@/types";
+import type { Turf, ApiTurfListItem, ApiTurfListResponse } from "@/types"; // Using shared types
 import Link from "next/link";
 import { MoreHorizontal, PlusCircle, Edit, Trash2, Eye, Loader2 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-
-// Interface for the API response structure for a single turf item in the data array
-interface ApiTurfItem {
-  turfID: string;
-  turfName: string;
-  turfAddress: string | null;
-  turfCity: string | null;
-  turfState: string | null;
-  turfPinCode: string | null;
-  turfType: string | null;
-  turfContactNo: string | null;
-  turfAltContactNo: string | null;
-  turfEmail: string | null;
-  turfImage: string | null;
-}
-
-// Interface for the overall API response
-interface ApiTurfResponse {
-  requestid: string;
-  success: boolean;
-  message: string;
-  statuscode: number | null;
-  errors: any | null; // Consider defining a more specific type if errors have a structure
-  currentpage: number;
-  pagesize: number;
-  totalpages: number;
-  totalitems: number;
-  orderby: string;
-  orderbydesc: boolean;
-  data: ApiTurfItem[];
-}
-
 
 export default function TurfsPage() {
   const [turfs, setTurfs] = useState<Turf[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchTurfs() {
-      setIsLoading(true);
-      setError(null);
-      const token = localStorage.getItem('authToken');
+  const fetchTurfsData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    const token = localStorage.getItem('authToken');
 
-      if (!token) {
-        setError("Authentication token not found. Please login again.");
+    if (!token) {
+      const msg = "Authentication token not found. Please login.";
+      setError(msg);
+      setIsLoading(false);
+      toast({
+        title: "Authentication Error",
+        description: msg,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', { // Using proxy
+        method: 'GET',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        let errorBody = `API Error: ${response.status}`;
+        try {
+          const text = await response.text();
+          errorBody += ` - ${text || response.statusText}`;
+        } catch (e) {
+          // ignore if reading text fails
+        }
+        console.error("Failed to fetch turfs:", errorBody);
+        setError(`Server Error: ${response.status}. Check console for details.`);
+        toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
         setIsLoading(false);
-        // Optionally redirect to login: router.push('/login');
-        toast({
-          title: "Error",
-          description: "Authentication token not found. Please login.",
-          variant: "destructive",
-        });
         return;
       }
 
-      try {
-        const response = await fetch('https://api.classic7turf.com/Turf/GetTurfList?page=1&pageSize=100', {
-          method: 'GET',
-          headers: {
-            'accept': '*/*',
-            'Authorization': `Bearer ${token}`,
-          },
+      const result: ApiTurfListResponse = await response.json();
+
+      if (result.success && result.data) {
+        const transformedTurfs: Turf[] = result.data.map((item: ApiTurfListItem) => {
+          const locationParts = [item.turfAddress, item.turfCity].filter(Boolean);
+          return {
+            id: item.turfID,
+            name: item.turfName,
+            turfAddress: item.turfAddress || undefined,
+            turfCity: item.turfCity || undefined,
+            turfState: item.turfState || undefined,
+            turfPinCode: item.turfPinCode || undefined,
+            location: locationParts.join(', ') || 'N/A',
+            turfType: item.turfType || undefined,
+            turfContactNo: item.turfContactNo || undefined,
+            turfEmail: item.turfEmail || undefined,
+            rawImage: item.turfImage || undefined,
+            images: [item.turfImage || `https://placehold.co/100x80.png`],
+            status: 'available', // Default status as API doesn't provide it
+          };
         });
-
-        if (!response.ok) {
-          const errorData = await response.text();
-          throw new Error(`API Error: ${response.status} - ${errorData || response.statusText}`);
+        setTurfs(transformedTurfs);
+        if (transformedTurfs.length === 0) {
+          toast({ title: "No Turfs Found", description: "The API returned an empty list of turfs." });
         }
-
-        const result: ApiTurfResponse = await response.json();
-
-        if (result.success && result.data) {
-          const transformedTurfs: Turf[] = result.data.map((item: ApiTurfItem) => {
-            const locationParts = [item.turfAddress, item.turfCity].filter(Boolean);
-            return {
-              id: item.turfID,
-              name: item.turfName,
-              turfAddress: item.turfAddress || undefined,
-              turfCity: item.turfCity || undefined,
-              turfState: item.turfState || undefined,
-              turfPinCode: item.turfPinCode || undefined,
-              location: locationParts.join(', ') || 'N/A',
-              turfType: item.turfType || undefined,
-              turfContactNo: item.turfContactNo || undefined,
-              turfEmail: item.turfEmail || undefined,
-              rawImage: item.turfImage || undefined,
-              images: [item.turfImage || `https://placehold.co/100x80.png`],
-              status: 'available', // Default status as API doesn't provide it
-              // description, pricing, amenities, operatingHours will be undefined or set to defaults if needed elsewhere
-            };
-          });
-          setTurfs(transformedTurfs);
-        } else {
-          throw new Error(result.message || "Failed to fetch turfs: API request was not successful.");
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
-        setError(errorMessage);
-        toast({
-          title: "Failed to load turfs",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        console.error("Fetch turfs error:", err);
-      } finally {
-        setIsLoading(false);
+      } else {
+        const msg = result.message || "Failed to process turfs data from API.";
+        setError(msg);
+        toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown network error fetching turfs.";
+      console.error("Network or unexpected error fetching turfs:", err);
+      setError(msg);
+      toast({ title: "Failed to load turfs", description: msg, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-
-    fetchTurfs();
   }, []);
+
+  useEffect(() => {
+    fetchTurfsData();
+  }, [fetchTurfsData]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -149,11 +127,11 @@ export default function TurfsPage() {
           ) : error ? (
             <div className="text-center py-10 text-destructive">
               <p>Error loading turfs: {error}</p>
-              <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+              <Button variant="outline" onClick={fetchTurfsData} className="mt-4">Try Again</Button>
             </div>
-          ) : turfs.length === 0 ? (
+          ) : turfs.length === 0 && !isLoading ? ( // Added !isLoading to prevent showing "No turfs found" during initial load
              <div className="text-center py-10 text-muted-foreground">
-              <p>No turfs found.</p>
+              <p>No turfs found. You can add a new turf to get started.</p>
                <Button asChild className="mt-4">
                   <Link href="/turfs/new">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Turf
@@ -181,8 +159,8 @@ export default function TurfsPage() {
                         height={64}
                         src={turf.images[0]}
                         width={64}
-                        data-ai-hint={turf.turfType ? turf.turfType.toLowerCase() : "sports field"}
-                        unoptimized={turf.images[0].startsWith('https://placehold.co')} // Prevent optimization for placeholder if needed
+                        data-ai-hint={turf.turfType ? turf.turfType.toLowerCase().split(' ')[0] : "sports field"} // Use first word of type
+                        unoptimized={turf.images[0].startsWith('https://placehold.co')}
                       />
                     </TableCell>
                     <TableCell className="font-medium">{turf.name}</TableCell>
