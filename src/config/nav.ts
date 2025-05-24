@@ -1,5 +1,6 @@
+
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Dribbble, CalendarClock, CalendarCheck2, Users, ShieldCheck, Cog } from 'lucide-react';
+import { LayoutDashboard, Dribbble, CalendarClock, CalendarCheck2, FileText, ShieldCheck, Cog } from 'lucide-react'; // Changed ShieldCheck to FileText for Reports
 
 export interface NavItem {
   title: string;
@@ -22,7 +23,7 @@ export const navItems: NavItem[] = [
   {
     title: 'Turf Management',
     href: '/turfs',
-    icon: Dribbble, 
+    icon: Dribbble,
   },
   {
     title: 'Availability',
@@ -35,14 +36,9 @@ export const navItems: NavItem[] = [
     icon: CalendarCheck2,
   },
   {
-    title: 'User Management',
-    href: '/users',
-    icon: Users,
-  },
-  {
-    title: 'Admin Management',
-    href: '/admin-users',
-    icon: ShieldCheck,
+    title: 'Reports', // Renamed from Admin Management
+    href: '/admin-users', // Route remains the same, content changes
+    icon: FileText, // Icon changed
   },
   // Example of a settings link, if needed later
   // {
