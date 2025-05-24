@@ -49,16 +49,16 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    try {
-      console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
-      const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
-      const requestHeaders = {
-        'accept': 'text/plain', // API example showed this, though response is JSON
-        'Content-Type': 'application/json',
-      };
-      console.log("API Endpoint:", apiEndpoint);
-      console.log("Request Headers:", requestHeaders);
+    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+    const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
+    const requestHeaders = {
+      'accept': 'text/plain', // API example showed this, though response is JSON
+      'Content-Type': 'application/json',
+    };
+    console.log("API Endpoint:", apiEndpoint);
+    console.log("Request Headers:", requestHeaders);
 
+    try {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: requestHeaders,
@@ -88,9 +88,7 @@ export default function LoginPage() {
       } else {
         let errorBody = "Could not read error body.";
         try {
-            // Try to read as text first, as error responses might not always be JSON
             errorBody = await response.text(); 
-            // If you expect JSON even for errors, you could try response.json() in another try-catch
         } catch (e) {
             console.error("Failed to read error body as text:", e);
         }
@@ -102,12 +100,21 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error("Full error object during fetch:", error); 
-      // Provide a more user-friendly message that hints at common issues
-      const message = error instanceof Error ? error.message : "An unexpected error occurred during login.";
+      console.error("Login API request failed. Full error object:", error);
+      let userMessage = "An unexpected error occurred during login. Please try again later.";
+
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. CORS issues must be resolved on the API server.";
+        console.warn(
+          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., http://localhost:xxxx)."
+        );
+      } else if (error instanceof Error) {
+        userMessage = `Login error: ${error.message}`;
+      }
+      
       toast({
-        title: "Error",
-        description: `API request failed: ${message}. This could be due to a network issue, the API server being unavailable, or a CORS policy preventing the request. Please check your browser's console for more details.`,
+        title: "Login Failed",
+        description: userMessage,
         variant: "destructive",
       });
     } finally {
