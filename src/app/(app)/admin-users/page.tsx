@@ -50,7 +50,6 @@ export default function ReportsPage() {
     }
 
     try {
-      // Using direct API call as per user's working example
       const response = await fetch('https://api.classic7turf.com/Turf/GetTurfList?page=1&pageSize=100', {
         method: 'GET',
         headers: {
@@ -61,7 +60,6 @@ export default function ReportsPage() {
 
       if (!response.ok) {
         const errorData = await response.text();
-        // Log the full error for easier debugging in console
         console.error("Failed to fetch turfs API Error:", response.status, errorData);
         setTurfListError(`Server Error: ${response.status}. Check console for details.`);
         toast({ title: "Failed to load turfs", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
@@ -74,8 +72,6 @@ export default function ReportsPage() {
         const transformedTurfs = result.data.map(apiTurf => ({ turfID: apiTurf.turfID, turfName: apiTurf.turfName }));
         setTurfsForSelect(transformedTurfs);
         if (transformedTurfs.length > 0 && !selectedTurfId) {
-          // Auto-select the first turf if none is selected
-          // This line was previously missing the check for !selectedTurfId which could cause re-selection
           setSelectedTurfId(transformedTurfs[0].turfID);
         }
       } else {
@@ -91,7 +87,7 @@ export default function ReportsPage() {
     } finally {
       setIsLoadingTurfs(false);
     }
-  }, [selectedTurfId]); // Added selectedTurfId as dependency to ensure re-fetch doesn't clear selection unnecessarily if logic changes
+  }, [selectedTurfId]); 
 
   useEffect(() => {
     fetchTurfsForSelect();
@@ -117,36 +113,41 @@ export default function ReportsPage() {
       return;
     }
 
-    const endpoint = reportType === 'active'
-      ? '/api-proxy/Reports/GetActiveReports?page=1&pageSize=100'
-      : '/api-proxy/Reports/GetCancelledReports?page=1&pageSize=100';
+    const formattedFromDate = format(fromDate, "yyyy-MM-dd");
+    const formattedToDate = format(toDate, "yyyy-MM-dd");
 
-    const payload = {
+    const requestBody = {
       turfID: selectedTurfId,
-      fromDate: format(fromDate, "yyyy-MM-dd"),
-      toDate: format(toDate, "yyyy-MM-dd"),
+      fromDate: formattedFromDate,
+      toDate: formattedToDate,
     };
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'accept': '*/*',
+    };
+    
+    const endpoint = reportType === 'active'
+      ? 'https://api.classic7turf.com/Reports/GetActiveReports?page=1&pageSize=100'
+      : 'https://api.classic7turf.com/Reports/GetCancelledReports?page=1&pageSize=100';
 
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'accept': '*/*',
-        },
-        body: JSON.stringify(payload),
+        headers: headers,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        let errorBody = `API Error: ${response.status}`;
+        let errorBodyText = `API Error: ${response.status}`;
         try {
           const text = await response.text();
-          errorBody += ` - ${text || response.statusText}`;
+          errorBodyText += ` - ${text || response.statusText}`;
         } catch (e) {
-          // ignore
+          // ignore if reading text fails
         }
-        console.error("Failed to fetch report:", errorBody);
+        console.error("Failed to fetch report:", errorBodyText);
         setReportError(`Server Error: ${response.status}. Check console for details.`);
         toast({ title: "Failed to load report", description: `The server responded with status ${response.status}. Please check console for more details.`, variant: "destructive" });
         setIsLoadingReport(false);
@@ -323,3 +324,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
