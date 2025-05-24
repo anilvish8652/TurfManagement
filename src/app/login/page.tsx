@@ -49,14 +49,17 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
     const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
     const requestHeaders = {
-      'accept': 'text/plain', // API example showed this, though response is JSON
+      'accept': 'text/plain',
       'Content-Type': 'application/json',
     };
+
+    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
     console.log("API Endpoint:", apiEndpoint);
     console.log("Request Headers:", requestHeaders);
+    console.log("Request Body:", JSON.stringify({ username: data.username, password: data.password }));
+
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -106,7 +109,7 @@ export default function LoginPage() {
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. CORS issues must be resolved on the API server.";
         console.warn(
-          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., http://localhost:xxxx)."
+          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., your development URL like http://localhost:xxxx)."
         );
       } else if (error instanceof Error) {
         userMessage = `Login error: ${error.message}`;
