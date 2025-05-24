@@ -277,25 +277,23 @@ export default function BookingsPage() {
         },
         body: JSON.stringify(payload),
       });
-
-      const responseText = await response.text(); 
       
       if (!response.ok) {
-        let errorMessage = responseText;
+        let errorMessage = await response.text();
         try {
           // If error response is JSON, try to parse its message
-          const errorJson = JSON.parse(responseText);
-          errorMessage = errorJson.message || responseText;
+          const errorJson = JSON.parse(errorMessage);
+          errorMessage = errorJson.message || errorMessage;
         } catch (e) {
           // It wasn't JSON, use the text itself
         }
         throw new Error(errorMessage || `API Error: ${response.status}`);
       }
 
-      // Assuming successful update if response.ok is true, as the success response is plain text
+      // Successful update
       toast({
         title: "Booking Updated!",
-        description: responseText || "Booking has been successfully updated.",
+        description: "Booking has been successfully updated.",
       });
       setIsUpdateDialogOpen(false);
       if (filterTurfId && filterFromDate && filterToDate) {
