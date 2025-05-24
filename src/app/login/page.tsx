@@ -76,14 +76,13 @@ export default function LoginPage() {
             result = JSON.parse(responseText); // Try to parse as JSON
         } catch (jsonError) {
             // If JSON parsing fails, it might be a plain text token
-            // This logic assumes if it's not JSON and response was .ok, it's a plain text token.
-            // A more robust API would consistently return JSON or have a clear content-type.
             console.warn("Could not parse login response as JSON. Assuming plain text token. Response text:", responseText);
-            // Basic check for JWT-like string
+            // Basic check for JWT-like string (contains dots, is a string)
             if (typeof responseText === 'string' && responseText.includes('.')) {
                  result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token)." };
             } else {
-                throw new Error("Login response was not valid JSON and could not be inferred as a token.");
+                // If it's not JSON and doesn't look like a token, but response was ok, it's an unexpected success format
+                throw new Error("Login response was successful but not valid JSON and could not be inferred as a token.");
             }
         }
         
@@ -114,6 +113,7 @@ export default function LoginPage() {
                 if (errorJson && errorJson.message) { 
                   errorBody = errorJson.message;
                 } else if (typeof errorJson === 'object' && errorJson !== null) { 
+                  // If it's an object but no message field, stringify it
                   errorBody = JSON.stringify(errorJson);
                 }
               } catch (jsonParseError) {
@@ -126,13 +126,16 @@ export default function LoginPage() {
         console.error("Login API responded with an error:", response.status, errorBody);
         
         let toastDescription = `Server responded with ${response.status}.`;
-        const displayErrorBody = errorBody.length > 200 ? errorBody.substring(0, 200) + "..." : errorBody; 
+        // Ensure errorBody is concise for the toast
+        const displayErrorBody = errorBody.length > 150 ? errorBody.substring(0, 150) + "..." : errorBody; 
 
         if (response.status === 500) {
           toastDescription = `An internal server error occurred on the API (500). Please check the API server logs. (Details: ${displayErrorBody})`;
         } else if (displayErrorBody && !displayErrorBody.toLowerCase().includes("internal server error")) { 
+            // Avoid duplicating "internal server error" if it's already in a generic errorBody
             toastDescription += ` ${displayErrorBody}`;
         }
+
 
         toast({
           title: "Login Failed",
@@ -144,7 +147,7 @@ export default function LoginPage() {
       console.error("Login API request failed. Full error object:", error);
       let userMessage = "An unexpected error occurred during login. Please try again later.";
 
-      if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+      if (error instanceof TypeError && (error.message.toLowerCase().includes('failed to fetch') || error.message.toLowerCase().includes('networkerror'))) {
         userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. If this is a CORS issue, it must be resolved on the API server.";
         console.warn(
           "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., http://localhost:xxxx) or use a proxy for development."
@@ -236,5 +239,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
