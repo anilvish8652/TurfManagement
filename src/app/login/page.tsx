@@ -53,7 +53,7 @@ export default function LoginPage() {
     // Using the Next.js proxy path
     const apiEndpoint = '/api-proxy/Auth/Login'; 
     const requestHeaders: HeadersInit = {
-      'accept': 'text/plain', // Kept as per your working direct call example
+      'accept': 'text/plain', // Reinstating this header to match cURL
       'Content-Type': 'application/json',
     };
     console.log("API Endpoint (via proxy):", apiEndpoint);
@@ -78,7 +78,8 @@ export default function LoginPage() {
         } catch (jsonError) {
             // If JSON parsing fails, it might be a plain text token
             console.warn("Could not parse login response as JSON. Assuming plain text token from proxy. Response text:", responseText);
-            if (typeof responseText === 'string' && responseText.includes('.')) { // Basic check for JWT-like string
+            // Basic check for JWT-like string. Adjust if your token has a different format.
+            if (typeof responseText === 'string' && responseText.includes('.')) { 
                  result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token via proxy)." };
             } else {
                 throw new Error("Login response via proxy was successful but not valid JSON and could not be inferred as a token.");
@@ -112,9 +113,11 @@ export default function LoginPage() {
                 if (errorJson && errorJson.message) { 
                   errorBody = errorJson.message;
                 } else if (typeof errorJson === 'object' && errorJson !== null) { 
+                  // If no 'message' field, stringify the whole JSON object for more context
                   errorBody = JSON.stringify(errorJson);
                 }
               } catch (jsonParseError) {
+                // It wasn't JSON, use the raw text
                 console.warn("Could not parse error body from proxy as JSON, using raw text:", jsonParseError);
               }
             }
@@ -129,6 +132,7 @@ export default function LoginPage() {
         if (response.status === 500) {
           toastDescription = `An internal server error occurred on the API (500 via proxy). Please check the API server logs. (Details: ${displayErrorBody})`;
         } else if (displayErrorBody && !displayErrorBody.toLowerCase().includes("internal server error")) { 
+            // Avoid duplicating "internal server error" if already in errorBody
             toastDescription += ` ${displayErrorBody}`;
         }
 
