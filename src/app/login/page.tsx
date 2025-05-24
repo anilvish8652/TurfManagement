@@ -61,6 +61,7 @@ export default function LoginPage() {
     console.log("Request Headers:", requestHeaders);
     console.log("Request Body:", JSON.stringify({ username: data.username, password: data.password }));
 
+
     try {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -89,16 +90,34 @@ export default function LoginPage() {
           });
         }
       } else {
+        // This block handles non-2xx responses, including 500
         let errorBody = "Could not read error body.";
         try {
             errorBody = await response.text(); 
+            // Attempt to parse as JSON if it looks like it, to get a 'message' field
+            if (errorBody.trim().startsWith('{')) {
+              try {
+                const errorJson = JSON.parse(errorBody);
+                if (errorJson && errorJson.message) {
+                  errorBody = errorJson.message;
+                }
+              } catch (jsonParseError) {
+                console.warn("Could not parse error body as JSON, using raw text:", jsonParseError);
+              }
+            }
         } catch (e) {
             console.error("Failed to read error body as text:", e);
         }
         console.error("Login API responded with an error:", response.status, errorBody);
+        
+        let toastDescription = `Server responded with ${response.status}. ${errorBody}`;
+        if (response.status === 500) {
+          toastDescription = `An internal server error occurred. Please try again later. (Details: ${errorBody})`;
+        }
+
         toast({
           title: "Login Failed",
-          description: `Server responded with ${response.status}. ${errorBody}`,
+          description: toastDescription,
           variant: "destructive",
         });
       }
@@ -106,10 +125,10 @@ export default function LoginPage() {
       console.error("Login API request failed. Full error object:", error);
       let userMessage = "An unexpected error occurred during login. Please try again later.";
 
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy that was not bypassed by the proxy. Please check your internet connection and the browser console for more details. If using a proxy, ensure it's configured correctly and the target API is reachable.";
+      if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        userMessage = "Network error: Could not connect to the API. This might be due to a network issue, the API server being unavailable, or a CORS policy if not using the proxy. Please check your internet connection and the browser console for more details.";
         console.warn(
-          "A 'Failed to fetch' error occurred. If a proxy is configured in next.config.js, ensure it points to the correct target API URL and the API server is running and accessible. This error can still occur if the proxy target itself is unreachable or has SSL issues."
+          "A 'Failed to fetch' error occurred. Ensure the proxy in next.config.js is correctly configured and the target API server is running and accessible from the Next.js server environment."
         );
       } else if (error instanceof Error) {
         userMessage = `Login error: ${error.message}`;
