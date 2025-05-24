@@ -49,17 +49,17 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    const apiEndpoint = 'https://api.classic7turf.com/Auth/Login';
+    // Use the proxy path defined in next.config.ts
+    const apiEndpoint = '/api-proxy/Auth/Login'; 
     const requestHeaders = {
-      'accept': 'text/plain',
+      // 'accept': 'text/plain', // Keep or remove based on what proxy forwards/API strictly needs
       'Content-Type': 'application/json',
     };
 
-    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
-    console.log("API Endpoint:", apiEndpoint);
+    console.log("Attempting to login via proxy with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+    console.log("Proxy API Endpoint:", apiEndpoint);
     console.log("Request Headers:", requestHeaders);
     console.log("Request Body:", JSON.stringify({ username: data.username, password: data.password }));
-
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -107,9 +107,9 @@ export default function LoginPage() {
       let userMessage = "An unexpected error occurred during login. Please try again later.";
 
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy. Please check your internet connection and the browser console for more details. CORS issues must be resolved on the API server.";
+        userMessage = "Network error: Failed to fetch the login API. This could be due to a network issue, the API server being unavailable, or a CORS (Cross-Origin Resource Sharing) policy that was not bypassed by the proxy. Please check your internet connection and the browser console for more details. If using a proxy, ensure it's configured correctly and the target API is reachable.";
         console.warn(
-          "A 'Failed to fetch' error occurred. This often indicates a CORS misconfiguration on the API server (https://api.classic7turf.com). Ensure the server is configured to accept requests from this frontend's origin (e.g., your development URL like http://localhost:xxxx)."
+          "A 'Failed to fetch' error occurred. If a proxy is configured in next.config.js, ensure it points to the correct target API URL and the API server is running and accessible. This error can still occur if the proxy target itself is unreachable or has SSL issues."
         );
       } else if (error instanceof Error) {
         userMessage = `Login error: ${error.message}`;

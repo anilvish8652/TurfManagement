@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api-proxy/:path*',
+        destination: 'https://api.classic7turf.com/:path*', // Proxy to your backend
+      },
+    ];
+  },
 };
 
 export default nextConfig;
