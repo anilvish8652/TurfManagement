@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import type { Booking, ApiBookingReportItem, ApiBookingReportResponse, ApiBookingDetailItem, PaymentDetail, UpdateBookingPayload, ApiBookingDetailsResponse } from "@/types";
 import Link from "next/link";
-import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2, Edit } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Filter, CalendarIcon, Loader2, Edit, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,6 +17,16 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { BookingDetailsDialog } from "@/components/booking/BookingDetailsDialog";
 import { UpdateBookingDialog } from "@/components/booking/UpdateBookingDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 const parseBookingDateTime = (apiBookingDate: string, apiBookingSlots: string): { startTime: Date, endTime: Date, bookedAt: Date } => {
@@ -41,19 +51,18 @@ const transformApiReportItemToBooking = (item: ApiBookingReportItem, type: 'acti
   if (type === 'cancelled') {
     status = 'cancelled';
   } else if (type === 'active') {
-    // Assuming "Done" means confirmed/completed. Other statuses might need more specific mapping.
     if (item.paymentStatus.toLowerCase() === 'done' || item.paymentStatus.toLowerCase() === 'paid') {
       status = new Date() > endTime ? 'completed' : 'confirmed';
     } else if (item.paymentStatus.toLowerCase() === 'pending') {
       status = 'pending_payment';
     } else {
-      status = 'confirmed'; // Default for active if not clearly pending or done
+      status = 'confirmed'; 
     }
   }
 
   return {
     id: item.bookingID,
-    turfId: turfIdUsedForFilter, // The turfId used to make the API call
+    turfId: turfIdUsedForFilter,
     turfName: item.turfBooked,
     userName: item.bookingPersonName,
     startTime,
@@ -86,6 +95,10 @@ export default function BookingsPage() {
   const [selectedBookingForUpdate, setSelectedBookingForUpdate] = useState<Booking | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isUpdatingBooking, setIsUpdatingBooking] = useState(false);
+
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [bookingToCancelId, setBookingToCancelId] = useState<string | null>(null);
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
 
 
   const fetchBookingReports = useCallback(async (turfID: string, fromDate: Date, toDate: Date) => {
@@ -281,7 +294,6 @@ export default function BookingsPage() {
       if (!response.ok) {
         let errorMessage = await response.text();
         try {
-          // If error response is JSON, try to parse its message
           const errorJson = JSON.parse(errorMessage);
           errorMessage = errorJson.message || errorMessage;
         } catch (e) {
@@ -289,8 +301,7 @@ export default function BookingsPage() {
         }
         throw new Error(errorMessage || `API Error: ${response.status}`);
       }
-
-      // Successful update
+      
       toast({
         title: "Booking Updated!",
         description: "Booking has been successfully updated.",
@@ -309,6 +320,68 @@ export default function BookingsPage() {
       console.error("Update booking error:", error);
     } finally {
       setIsUpdatingBooking(false);
+    }
+  };
+
+  const handleOpenCancelDialog = (bookingId: string) => {
+    setBookingToCancelId(bookingId);
+    setIsCancelDialogOpen(true);
+  };
+
+  const handleConfirmCancelBooking = async () => {
+    if (!bookingToCancelId) return;
+    setIsCancellingBooking(true);
+    const token = localStorage.getItem('authToken');
+
+    if (!token) {
+      toast({ title: "Authentication Error", description: "Token not found.", variant: "destructive" });
+      setIsCancellingBooking(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.classic7turf.com/Turf/CancelBooking?BookingID=${bookingToCancelId}`, {
+        method: 'GET',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Failed to cancel booking.";
+        try {
+            const errorData = await response.json(); // Assuming error response is JSON
+            errorMessage = errorData.message || `API Error: ${response.status}`;
+        } catch (e) {
+            errorMessage = await response.text() || `API Error: ${response.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Assuming successful cancellation API might return a simple text or JSON success message
+      // const successMessage = await response.text(); 
+
+      toast({
+        title: "Booking Cancelled",
+        description: `Booking ID ${bookingToCancelId} has been successfully cancelled.`, // Or use successMessage
+      });
+      setIsCancelDialogOpen(false);
+      setBookingToCancelId(null);
+      // Refresh the bookings list
+      if (filterTurfId && filterFromDate && filterToDate) {
+        fetchBookingReports(filterTurfId, filterFromDate, filterToDate);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during cancellation.";
+      toast({
+        title: "Cancellation Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      console.error("Cancel booking error:", error);
+    } finally {
+      setIsCancellingBooking(false);
     }
   };
 
@@ -468,7 +541,12 @@ export default function BookingsPage() {
                           )}
                           {booking.status === 'confirmed' && <DropdownMenuItem>Mark as Completed</DropdownMenuItem>}
                           {(booking.status === 'confirmed' || booking.status === 'pending_payment') && 
-                            <DropdownMenuItem className="text-destructive hover:text-destructive focus:text-destructive">Cancel Booking</DropdownMenuItem>}
+                            <DropdownMenuItem 
+                              onClick={() => handleOpenCancelDialog(booking.id)}
+                              className="flex items-center text-destructive hover:text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Cancel Booking
+                            </DropdownMenuItem>}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -496,7 +574,28 @@ export default function BookingsPage() {
             isLoading={isUpdatingBooking}
         />
       )}
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to cancel this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Booking ID: {bookingToCancelId}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBookingToCancelId(null)} disabled={isCancellingBooking}>
+              Back
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCancelBooking} disabled={isCancellingBooking} className={buttonVariants({ variant: "destructive" })}>
+              {isCancellingBooking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {isCancellingBooking ? "Cancelling..." : "Yes, Cancel Booking"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
+
+    
