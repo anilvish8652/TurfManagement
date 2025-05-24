@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import type { ApiBookingReportItem, ApiBookingReportResponse, Turf, ApiTurfListItem, ApiTurfListResponse } from "@/types";
+import type { ApiBookingReportItem, ApiBookingReportResponse, ApiTurfListItem, ApiTurfListResponse } from "@/types"; // Turf type for selectedTurf
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Loader2, CalendarIcon, FileSearch } from "lucide-react";
@@ -18,7 +18,7 @@ type ReportType = 'active' | 'cancelled';
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>('active');
   const [selectedTurfId, setSelectedTurfId] = useState<string | undefined>(undefined);
-  const [turfsForSelect, setTurfsForSelect] = useState<Pick<Turf, 'id' | 'name'>[]>([]);
+  const [turfsForSelect, setTurfsForSelect] = useState<Pick<ApiTurfListItem, 'turfID' | 'turfName'>[]>([]);
   const [isLoadingTurfs, setIsLoadingTurfs] = useState(true);
   const [turfListError, setTurfListError] = useState<string | null>(null);
 
@@ -44,20 +44,24 @@ export default function ReportsPage() {
     }
 
     try {
-      const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', { // Assuming proxy is set up
+      const response = await fetch('/api-proxy/Turf/GetTurfList?page=1&pageSize=100', {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'accept': '*/*',
+        },
       });
 
-      if (!response.ok) throw new Error(`API Error fetching turfs: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error fetching turfs: ${response.status} - ${errorText || response.statusText}`);
+      }
       const result: ApiTurfListResponse = await response.json();
 
       if (result.success && result.data) {
-        const transformedTurfs = result.data.map(apiTurf => ({ id: apiTurf.turfID, name: apiTurf.turfName }));
+        // Using ApiTurfListItem structure directly for simplicity if only id and name are needed for the state
+        const transformedTurfs = result.data.map(apiTurf => ({ turfID: apiTurf.turfID, turfName: apiTurf.turfName }));
         setTurfsForSelect(transformedTurfs);
-        if (transformedTurfs.length > 0 && !selectedTurfId) {
-          setSelectedTurfId(transformedTurfs[0].id); // Auto-select first turf
-        }
       } else {
         throw new Error(result.message || "Failed to fetch turfs for selection.");
       }
@@ -68,11 +72,19 @@ export default function ReportsPage() {
     } finally {
       setIsLoadingTurfs(false);
     }
-  }, [selectedTurfId]);
+  }, []); // Removed selectedTurfId dependency
 
   useEffect(() => {
     fetchTurfsForSelect();
   }, [fetchTurfsForSelect]);
+
+  useEffect(() => {
+    // Auto-select the first turf when the list loads and no turf is currently selected
+    if (turfsForSelect.length > 0 && !selectedTurfId) {
+        setSelectedTurfId(turfsForSelect[0].turfID);
+    }
+  }, [turfsForSelect, selectedTurfId]);
+
 
   const fetchReportData = useCallback(async () => {
     if (!selectedTurfId || !fromDate || !toDate) {
@@ -83,7 +95,7 @@ export default function ReportsPage() {
 
     setIsLoadingReport(true);
     setReportError(null);
-    setReportData([]);
+    setReportData([]); // Clear previous report data
     const token = localStorage.getItem('authToken');
     if (!token) {
       setReportError("Authentication token not found.");
@@ -170,7 +182,7 @@ export default function ReportsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {turfsForSelect.map((turf) => (
-                    <SelectItem key={turf.id} value={turf.id}>{turf.name}</SelectItem>
+                    <SelectItem key={turf.turfID} value={turf.turfID}>{turf.turfName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -231,7 +243,7 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle>Report Results</CardTitle>
           <CardDescription>
-            Displaying {reportType === 'active' ? 'active' : 'cancelled'} bookings for {turfsForSelect.find(t => t.id === selectedTurfId)?.name || 'selected turf'}
+            Displaying {reportType === 'active' ? 'active' : 'cancelled'} bookings for {turfsForSelect.find(t => t.turfID === selectedTurfId)?.turfName || 'selected turf'}
             {fromDate && toDate && ` from ${format(fromDate, "PPP")} to ${format(toDate, "PPP")}`}.
           </CardDescription>
         </CardHeader>
@@ -264,7 +276,7 @@ export default function ReportsPage() {
                     <TableCell className="font-medium">{item.bookingID}</TableCell>
                     <TableCell>{item.turfBooked}</TableCell>
                     <TableCell>{item.bookingPersonName}</TableCell>
-                    <TableCell>{item.bookingDate}</TableCell> {/* Displaying raw date string */}
+                    <TableCell>{item.bookingDate}</TableCell> 
                     <TableCell>{item.bookingSlots}</TableCell>
                     <TableCell>₹{parseFloat(item.amount).toFixed(2)}</TableCell>
                     <TableCell>₹{parseFloat(item.balanceAmount).toFixed(2)}</TableCell>
@@ -280,3 +292,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

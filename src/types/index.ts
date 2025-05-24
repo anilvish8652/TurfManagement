@@ -60,7 +60,7 @@ export interface TimeSlot {
   date: Date; // The specific date for this slot
   startTime: string; // "HH:mm"
   endTime: string; // "HH:mm"
-  status: 'available' | 'booked' | 'unavailable';
+  status: 'available' | 'booked' | 'unavailable'; // 'unavailable' replaces 'blocked_by_admin'
   price?: string; // From API
   dayOfWeek?: string; // From API, optional
 }
@@ -121,15 +121,31 @@ export interface CreateBookingPayload {
 export interface ApiTurfListItem {
   turfID: string;
   turfName: string;
-  // ... other fields from GetTurfList if needed for selection context
+  turfAddress: string | null;
+  turfCity: string | null;
+  turfState: string | null;
+  turfPinCode: string | null;
+  turfType: string | null;
+  turfContactNo: string | null;
+  turfAltContactNo: string | null;
+  turfEmail: string | null;
+  turfImage: string | null;
 }
 
 // Interface for the overall API response for GetTurfList
 export interface ApiTurfListResponse {
+  requestid: string;
   success: boolean;
   message: string;
+  statuscode: number | null;
+  errors: any | null;
+  currentpage: number;
+  pagesize: number;
+  totalpages: number;
+  totalitems: number;
+  orderby: string;
+  orderbydesc: boolean;
   data: ApiTurfListItem[];
-  // ... other fields from GetTurfList response
 }
 
 
@@ -142,7 +158,7 @@ export interface ApiBookingReportItem {
   bookingSlots: string; // "HH:mm-HH:mm" e.g. "07:00-08:30"
   amount: string; // "1800.00"
   balanceAmount: string;
-  discountAmount: string;
+  discountAmount: string | null; // Can be null from API
   paymentStatus: string; // e.g. "Done"
 }
 
@@ -212,3 +228,5 @@ export interface UpdateBookingPayload {
   discountAmount: string; // Total discount
   finalAmount: string; // Original total price
 }
+
+    
