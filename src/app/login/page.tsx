@@ -49,45 +49,108 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
-    // Using direct API call as per user's "working" example
-    const apiEndpoint = 'https://api.classic7turf.com/Auth/Login'; 
-    const requestHeaders: HeadersInit = {
-      'accept': 'text/plain', 
+    console.log("Login Step 1: Getting pre-auth token with static credentials.");
+    const preAuthApiEndpoint = 'https://api.classic7turf.com/Auth/Login';
+    const preAuthRequestHeaders = {
+      'accept': 'text/plain',
       'Content-Type': 'application/json',
     };
-    console.log("API Endpoint:", apiEndpoint);
-    console.log("Request Headers:", requestHeaders);
 
+    let preAuthToken: string | null = null;
+
+    // Step 1: Get pre-authentication token
     try {
-      const response = await fetch(apiEndpoint, {
+      const preAuthResponse = await fetch(preAuthApiEndpoint, {
         method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify({ username: data.username, password: data.password }),
+        headers: preAuthRequestHeaders,
+        body: JSON.stringify({ username: "tech", password: "pass1234" }), // Static credentials
       });
 
-      console.log("Fetch response status:", response.status);
-      console.log("Fetch response ok:", response.ok);
+      console.log("Pre-auth API response status:", preAuthResponse.status);
+      console.log("Pre-auth API response ok:", preAuthResponse.ok);
 
-      if (response.ok) {
-        let result;
-        const responseText = await response.text(); // Read as text first
-        try {
-            result = JSON.parse(responseText); // Try to parse as JSON
-        } catch (jsonError) {
-            // If JSON parsing fails, it might be a plain text token
-            console.warn("Could not parse login response as JSON. Assuming plain text token. Response text:", responseText);
-            if (typeof responseText === 'string' && responseText.includes('.')) { 
-                 result = { token: responseText, isValidUser: true, message: "Login successful (inferred from text token)." };
-            } else {
-                throw new Error("Login response was successful but not valid JSON and could not be inferred as a token.");
-            }
+      if (preAuthResponse.ok) {
+        const preAuthResult = await preAuthResponse.json();
+        console.log("Pre-auth API Result:", preAuthResult);
+        if (preAuthResult.isValidUser && preAuthResult.token) {
+          preAuthToken = preAuthResult.token;
+          console.log("Pre-auth token obtained successfully.");
+        } else {
+          toast({
+            title: "Pre-Auth Failed",
+            description: preAuthResult.message || "Could not obtain pre-auth token.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
         }
-        
-        console.log("API Login Result:", result);
+      } else {
+        let errorBody = "Could not read error body from pre-auth API.";
+        try {
+            errorBody = await preAuthResponse.text(); 
+        } catch (e) {
+            console.error("Failed to read error body from pre-auth API as text:", e);
+        }
+        console.error("Pre-auth API responded with an error:", preAuthResponse.status, errorBody);
+        toast({
+          title: "Pre-Auth Failed",
+          description: `Pre-auth server responded with ${preAuthResponse.status}. ${errorBody}`,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Pre-auth API request failed. Full error object:", error);
+      let userMessage = "An unexpected error occurred during pre-authentication.";
+       if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        userMessage = "Network error: Failed to fetch pre-auth API. Check connection or CORS on API server.";
+      } else if (error instanceof Error) {
+        userMessage = `Pre-auth error: ${error.message}`;
+      }
+      toast({
+        title: "Pre-Auth Failed",
+        description: userMessage,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
-        if (result && result.isValidUser && result.token) {
-          localStorage.setItem('authToken', result.token);
+    if (!preAuthToken) {
+        // This case should ideally be caught above, but as a safeguard.
+        toast({ title: "Login Error", description: "Failed to obtain necessary token for verification.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+    }
+
+    // Step 2: Verify User with the obtained pre-auth token
+    console.log("Login Step 2: Verifying user credentials.");
+    const verifyUserApiEndpoint = 'https://api.classic7turf.com/Login/VerifyUser?page=1&pageSize=100';
+    const verifyUserRequestHeaders = {
+      'accept': '*/*',
+      'Authorization': `Bearer ${preAuthToken}`,
+      'Content-Type': 'application/json',
+    };
+    
+    try {
+      const verifyResponse = await fetch(verifyUserApiEndpoint, {
+        method: 'POST',
+        headers: verifyUserRequestHeaders,
+        body: JSON.stringify({ loginID: data.username, password: data.password }), // User-entered credentials
+      });
+
+      console.log("Verify user API response status:", verifyResponse.status);
+      console.log("Verify user API response ok:", verifyResponse.ok);
+
+      if (verifyResponse.ok) {
+        const verifyResult = await verifyResponse.json();
+        console.log("Verify User API Result:", verifyResult);
+
+        // Assuming success means the API call was successful and verifyResult.success is true
+        // and verifyResult.data contains user information (e.g., verifyResult.data[0].userID)
+        if (verifyResult.success && verifyResult.data && verifyResult.data.length > 0 && verifyResult.data[0].userID) {
+          localStorage.setItem('authToken', preAuthToken); // Store the pre-auth token as the session token
           toast({
             title: "Login Successful",
             description: "Welcome back!",
@@ -96,48 +159,32 @@ export default function LoginPage() {
         } else {
           toast({
             title: "Login Failed",
-            description: result.message || "Invalid username or password, or user not valid.",
+            description: verifyResult.message || "Invalid username or password.",
             variant: "destructive",
           });
         }
       } else {
-        // Handle non-OK responses (e.g., 400, 401, 500)
-        let errorBody = "Could not read error body from server response.";
+        let errorBody = "Could not read error body from verify user API.";
         try {
-            errorBody = await response.text(); 
+            errorBody = await verifyResponse.text(); 
         } catch (e) {
-            console.error("Failed to read error body as text:", e);
+            console.error("Failed to read error body from verify user API as text:", e);
         }
-        // This is the line that would be hit for a 500 error.
-        console.error(`Login API responded with status: ${response.status}. Error body:`, errorBody);
-        
-        let userToastDescription = `Server responded with ${response.status}.`;
-        if (response.status === 500) {
-          userToastDescription = `API Internal Server Error (500). Please check API server logs. Details: ${errorBody.substring(0, 250)}`;
-        } else if (errorBody) {
-          userToastDescription += ` ${errorBody.substring(0, 250)}`;
-        }
-
+        console.error("Verify User API responded with an error:", verifyResponse.status, errorBody);
         toast({
           title: "Login Failed",
-          description: userToastDescription,
+          description: `Verification server responded with ${verifyResponse.status}. ${errorBody}`,
           variant: "destructive",
         });
       }
     } catch (error) {
-      // Handle network errors (e.g., "Failed to fetch") or errors from JSON.parse or thrown new Error
-      console.error("Login API request failed. Full error object:", error);
-      let userMessage = "An unexpected error occurred during login. Please try again later.";
-
+      console.error("Verify User API request failed. Full error object:", error);
+      let userMessage = "An unexpected error occurred during user verification.";
       if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
-        userMessage = "Network error: Failed to fetch the login API. This could be a network issue, the API server being unavailable, or a CORS policy violation. Please check your internet connection, browser console, and ensure the API server (https://api.classic7turf.com) allows requests from this origin.";
-        console.warn(
-          "A 'Failed to fetch' error occurred. If using a direct API call as configured, this often indicates a CORS misconfiguration on the API server. Ensure the server's CORS policy is set to accept requests from this frontend's origin (e.g., http://localhost:xxxx)."
-        );
+        userMessage = "Network error: Failed to fetch verify user API. Check connection or CORS on API server.";
       } else if (error instanceof Error) {
-        userMessage = `Login error: ${error.message}`;
+        userMessage = `Verification error: ${error.message}`;
       }
-      
       toast({
         title: "Login Failed",
         description: userMessage,
