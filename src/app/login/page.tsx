@@ -23,8 +23,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import Link from "next/link";
+import Image from "next/image"; // Import Next.js Image component
 import { useRouter } from "next/navigation";
-import { LogIn, ToyBrick } from "lucide-react";
+import { LogIn } from "lucide-react"; // Removed ToyBrick
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -49,16 +50,18 @@ export default function LoginPage() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
-    console.log("Login Step 1: Getting pre-auth token with static credentials.");
+    console.log("Attempting to login with:", { username: data.username, password: "REDACTED_FOR_LOGS" });
+    
+    // Step 1: Get pre-authentication token with static credentials
     const preAuthApiEndpoint = 'https://api.classic7turf.com/Auth/Login';
     const preAuthRequestHeaders = {
       'accept': 'text/plain',
       'Content-Type': 'application/json',
     };
-
     let preAuthToken: string | null = null;
+    console.log("Login Step 1: Fetching pre-auth token from:", preAuthApiEndpoint);
+    console.log("Pre-auth Request Headers:", preAuthRequestHeaders);
 
-    // Step 1: Get pre-authentication token
     try {
       const preAuthResponse = await fetch(preAuthApiEndpoint, {
         method: 'POST',
@@ -94,7 +97,7 @@ export default function LoginPage() {
         console.error("Pre-auth API responded with an error:", preAuthResponse.status, errorBody);
         toast({
           title: "Pre-Auth Failed",
-          description: `Pre-auth server responded with ${preAuthResponse.status}. ${errorBody}`,
+          description: `Pre-auth server responded with ${preAuthResponse.status}. ${errorBody.substring(0,150)}`,
           variant: "destructive",
         });
         setIsLoading(false);
@@ -118,7 +121,6 @@ export default function LoginPage() {
     }
 
     if (!preAuthToken) {
-        // This case should ideally be caught above, but as a safeguard.
         toast({ title: "Login Error", description: "Failed to obtain necessary token for verification.", variant: "destructive" });
         setIsLoading(false);
         return;
@@ -132,6 +134,8 @@ export default function LoginPage() {
       'Authorization': `Bearer ${preAuthToken}`,
       'Content-Type': 'application/json',
     };
+    console.log("Verify User API Endpoint:", verifyUserApiEndpoint);
+    console.log("Verify User Request Headers:", verifyUserRequestHeaders);
     
     try {
       const verifyResponse = await fetch(verifyUserApiEndpoint, {
@@ -147,8 +151,6 @@ export default function LoginPage() {
         const verifyResult = await verifyResponse.json();
         console.log("Verify User API Result:", verifyResult);
 
-        // Assuming success means the API call was successful and verifyResult.success is true
-        // and verifyResult.data contains user information (e.g., verifyResult.data[0].userID)
         if (verifyResult.success && verifyResult.data && verifyResult.data.length > 0 && verifyResult.data[0].userID) {
           localStorage.setItem('authToken', preAuthToken); // Store the pre-auth token as the session token
           toast({
@@ -173,7 +175,7 @@ export default function LoginPage() {
         console.error("Verify User API responded with an error:", verifyResponse.status, errorBody);
         toast({
           title: "Login Failed",
-          description: `Verification server responded with ${verifyResponse.status}. ${errorBody}`,
+          description: `Verification server responded with ${verifyResponse.status}. ${errorBody.substring(0,150)}`,
           variant: "destructive",
         });
       }
@@ -198,7 +200,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="mb-8 flex flex-col items-center text-center">
-        <ToyBrick className="h-12 w-12 text-primary mb-2" />
+        {/* Replace ToyBrick with Image component */}
+        <Image src="/logo.png" alt="Classic7 Logo" width={48} height={48} className="h-12 w-12 mb-2" />
         <h1 className="text-3xl font-bold text-primary">Classic7</h1>
         <p className="text-muted-foreground">Welcome back! Please sign in to continue.</p>
       </div>

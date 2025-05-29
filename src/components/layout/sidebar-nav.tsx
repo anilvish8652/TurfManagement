@@ -2,11 +2,11 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image'; // Import Next.js Image component
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { navItems, type NavItem } from '@/config/nav';
 import {
-  Sidebar,
   SidebarContent,
   SidebarHeader,
   SidebarFooter,
@@ -16,7 +16,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { LogOut, Moon, Sun, ToyBrick } from 'lucide-react'; // ToyBrick as a generic logo
+import { LogOut, Moon, Sun } from 'lucide-react'; // Removed ToyBrick
 import { Separator } from '../ui/separator';
 import { useEffect, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
@@ -86,7 +86,8 @@ export function AppSidebarNav() {
     <>
       <SidebarHeader className="p-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <ToyBrick className="h-8 w-8 text-primary" />
+          {/* Replace ToyBrick with Image component */}
+          <Image src="/logo.png" alt="Classic7 Logo" width={32} height={32} className="h-8 w-8" />
           {sidebarState === 'expanded' && (
             <h1 className="text-xl font-semibold">Classic7</h1>
           )}

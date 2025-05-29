@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Dribbble, CalendarClock, CalendarCheck2, FileText, ShieldCheck, Cog } from 'lucide-react'; // Changed ShieldCheck to FileText for Reports
+import { LayoutDashboard, Dribbble, CalendarClock, CalendarCheck2, FileText, Cog } from 'lucide-react';
 
 export interface NavItem {
   title: string;
@@ -36,9 +36,9 @@ export const navItems: NavItem[] = [
     icon: CalendarCheck2,
   },
   {
-    title: 'Reports', // Renamed from Admin Management
-    href: '/admin-users', // Route remains the same, content changes
-    icon: FileText, // Icon changed
+    title: 'Reports',
+    href: '/admin-users',
+    icon: FileText,
   },
   // Example of a settings link, if needed later
   // {
