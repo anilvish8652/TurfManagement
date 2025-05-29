@@ -58,9 +58,9 @@ export interface TimeSlot {
   id: string; // Mapped from slotID
   turfId: string; // Mapped from turfID in API response
   date: Date; // The specific date for this slot
-  startTime: string; // "HH:mm"
-  endTime: string; // "HH:mm"
-  status: 'available' | 'booked' | 'unavailable'; // 'unavailable' replaces 'blocked_by_admin'
+  startTime: string; // "HH:mm" (24-hour format for display and internal use)
+  endTime: string; // "HH:mm" (24-hour format for display and internal use)
+  status: 'available' | 'booked' | 'unavailable'; 
   price?: string; // From API
   dayOfWeek?: string; // From API, optional
 }
@@ -79,8 +79,8 @@ interface ApiSlotItem {
   turfID: string;
   slotID: string;
   dayOfWeek: string;
-  startTime: string; // "HH:mm:ss"
-  endTime: string; // "HH:mm:ss"
+  startTime: string; // Expected format from API: "hh:mm aa" (e.g., "07:00 AM")
+  endTime: string;   // Expected format from API: "hh:mm aa" (e.g., "07:30 AM")
   price: string;
   slotStatus: string; // e.g., "Available", "Booked"
 }

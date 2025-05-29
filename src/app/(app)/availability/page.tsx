@@ -137,15 +137,16 @@ export default function AvailabilityPage() {
             status = 'booked'; 
           }
           
-          const parsedStartTime = parse(apiSlot.startTime, "HH:mm:ss", new Date());
-          const parsedEndTime = parse(apiSlot.endTime, "HH:mm:ss", new Date());
+          // API now sends time in "hh:mm aa" format, e.g., "07:00 AM", "12:30 PM"
+          const parsedStartTime = parse(apiSlot.startTime, "hh:mm aa", new Date());
+          const parsedEndTime = parse(apiSlot.endTime, "hh:mm aa", new Date());
 
           return {
             id: apiSlot.slotID,
             turfId: apiSlot.turfID, 
             date: date, 
-            startTime: format(parsedStartTime, "HH:mm"),
-            endTime: format(parsedEndTime, "HH:mm"),
+            startTime: format(parsedStartTime, "HH:mm"), // Display in 24-hour "HH:mm" format
+            endTime: format(parsedEndTime, "HH:mm"),   // Display in 24-hour "HH:mm" format
             status: status, 
             price: apiSlot.price,
             dayOfWeek: apiSlot.dayOfWeek,
@@ -333,14 +334,13 @@ export default function AvailabilityPage() {
                   let labelText = 'Available';
 
                   if (isApiBooked) {
-                    variant = 'destructive';
+                    variant = 'destructive'; // Changed from 'secondary' to 'destructive' for red
                     isDisabled = true;
-                    labelText = 'Booked';
-                  } else if (isSelectedForBooking) { // slot.status must be 'available'
+                    labelText = 'Booked'; // Changed from 'Booked by User'
+                  } else if (isSelectedForBooking) { 
                     variant = 'default';
                     labelText = 'Selected';
                   }
-                  // Else, it's 'available' and not selected, variant remains 'outline', labelText 'Available'
 
                   return (
                     <Button
@@ -397,4 +397,5 @@ export default function AvailabilityPage() {
     </div>
   );
 }
+
 
