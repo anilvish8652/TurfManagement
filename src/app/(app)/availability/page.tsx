@@ -137,15 +137,13 @@ export default function AvailabilityPage() {
             status = 'booked'; 
           }
           
-          const parsedStartTime = parse(apiSlot.startTime, "hh:mm aa", new Date());
-          const parsedEndTime = parse(apiSlot.endTime, "hh:mm aa", new Date());
-
+          // API returns time in "hh:mm aa" format, directly use it.
           return {
             id: apiSlot.slotID,
             turfId: apiSlot.turfID, 
             date: date, 
-            startTime: format(parsedStartTime, "hh:mm aa"), // Store in 12-hour AM/PM format
-            endTime: format(parsedEndTime, "hh:mm aa"),   // Store in 12-hour AM/PM format
+            startTime: apiSlot.startTime, // Directly use API format "07:00 AM"
+            endTime: apiSlot.endTime,   // Directly use API format "07:30 AM"
             status: status, 
             price: apiSlot.price,
             dayOfWeek: apiSlot.dayOfWeek,
@@ -323,7 +321,7 @@ export default function AvailabilityPage() {
                   <Button variant="outline" onClick={() => selectedTurfId && selectedDate && fetchAvailableSlots(selectedTurfId, selectedDate)} className="mt-4">Try Again</Button>
               </div>
             ) : timeSlots.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {timeSlots.map((slot) => {
                   const isApiBooked = slot.status === 'booked';
                   const isSelectedForBooking = selectedSlotIdsForBooking.includes(slot.id);
@@ -396,3 +394,4 @@ export default function AvailabilityPage() {
     </div>
   );
 }
+
