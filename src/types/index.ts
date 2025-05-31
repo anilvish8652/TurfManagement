@@ -58,8 +58,8 @@ export interface TimeSlot {
   id: string; // Mapped from slotID
   turfId: string; // Mapped from turfID in API response
   date: Date; // The specific date for this slot
-  startTime: string; // "HH:mm" (24-hour format for display and internal use)
-  endTime: string; // "HH:mm" (24-hour format for display and internal use)
+  startTime: string; // "hh:mm aa" (12-hour format with AM/PM for display)
+  endTime: string;   // "hh:mm aa" (12-hour format with AM/PM for display)
   status: 'available' | 'booked' | 'unavailable'; 
   price?: string; // From API
   dayOfWeek?: string; // From API, optional
@@ -228,5 +228,3 @@ export interface UpdateBookingPayload {
   discountAmount: string; // Total discount
   finalAmount: string; // Original total price
 }
-
-    
