@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -134,7 +135,7 @@ export default function UserProfilePage() {
                       <TableCell>
                         <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'completed' ? 'secondary' : 'destructive'}>{booking.status}</Badge>
                       </TableCell>
-                      <TableCell>${booking.totalPrice.toFixed(2)}</TableCell>
+                      <TableCell>₹{booking.totalPrice.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

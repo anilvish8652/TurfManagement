@@ -140,7 +140,7 @@ export default function NewBookingPage() {
                       </FormControl>
                       <SelectContent>
                         {dummyTurfs.map(turf => (
-                          <SelectItem key={turf.id} value={turf.id}>{turf.name} (${turf.pricing}/hr)</SelectItem>
+                          <SelectItem key={turf.id} value={turf.id}>{turf.name} (₹{turf.pricing}/hr)</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -248,7 +248,7 @@ export default function NewBookingPage() {
                   <p>Selected User: <span className="font-medium">{dummyUsers.find(u => u.id === form.getValues("userId"))?.name || 'N/A'}</span></p>
                   <p>Date: <span className="font-medium">{form.getValues("bookingDate") ? format(form.getValues("bookingDate"), "PPP") : 'N/A'}</span></p>
                   <p>Time: <span className="font-medium">{startTime} - {endTime}</span></p>
-                  <p className="text-base font-bold">Estimated Price: <span className="text-primary">{calculatedPrice !== null ? `$${calculatedPrice.toFixed(2)}` : 'N/A'}</span></p>
+                  <p className="text-base font-bold">Estimated Price: <span className="text-primary">{calculatedPrice !== null ? `₹${calculatedPrice.toFixed(2)}` : 'N/A'}</span></p>
                 </div>
               </div>
 
