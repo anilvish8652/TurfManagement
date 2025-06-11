@@ -30,10 +30,15 @@ import { toast } from '@/hooks/use-toast';
 
 const bookingFormSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
-  email: z.string().email('Invalid email address'),
+  email: z.string()
+    .refine(value => value === "" || z.string().email().safeParse(value).success, {
+      message: "Invalid email format (or leave empty)",
+    })
+    .optional()
+    .default(""),
   mobileNumber: z.string().min(10, 'Mobile number must be at least 10 digits').regex(/^\d+$/, "Mobile number must contain only digits"),
   altMobileNumber: z.string().optional().or(z.literal('')),
-  advanceAmount: z.string().regex(/^\d*\.?\d*$/, "Invalid amount").min(1, "Advance amount is required"), // Allow numbers, can be string from API
+  advanceAmount: z.string().regex(/^\d*\.?\d*$/, "Invalid amount").min(1, "Advance amount is required"),
   discountAmount: z.string().regex(/^\d*\.?\d*$/, "Invalid amount").default("0"),
   paymentMode: z.string().min(1, 'Payment mode is required'),
   transactionID: z.string().min(1, 'Transaction ID or reference is required'),
@@ -89,7 +94,7 @@ export function BookingFormDialog({
 
   useEffect(() => {
     if (isOpen) {
-      form.reset({ // Reset form when dialog opens to initial default values
+      form.reset({ 
         fullName: '',
         email: '',
         mobileNumber: '',
@@ -111,9 +116,10 @@ export function BookingFormDialog({
 
     const payload: CreateBookingPayload = {
       ...values,
+      email: values.email || "", // Ensure email is a string, even if empty
       turfID: turfId,
-      slotID: [selectedSlots.map(s => s.id).join(',')], // API expects an array with a single comma-separated string
-      bookingDate: bookingDate, // Already in YYYY-MM-DD from availability page
+      slotID: [selectedSlots.map(s => s.id).join(',')], 
+      bookingDate: bookingDate, 
       finalAmount: finalAmount.toFixed(2),
       advanceAmount: parseFloat(values.advanceAmount).toFixed(2),
       discountAmount: parseFloat(values.discountAmount || '0').toFixed(2),
@@ -151,7 +157,7 @@ export function BookingFormDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email (Optional)</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="john.doe@example.com" {...field} />
                   </FormControl>
@@ -198,7 +204,6 @@ export function BookingFormDialog({
                         <FormControl>
                             <Input type="number" placeholder="e.g., 500" {...field} onChange={e => {
                                 field.onChange(e.target.value);
-                                // form.trigger('discountAmount'); // Not needed if no cross-validation based on this
                             }}/>
                         </FormControl>
                         <FormMessage />
@@ -214,7 +219,6 @@ export function BookingFormDialog({
                         <FormControl>
                             <Input type="number" placeholder="e.g., 100" {...field} onChange={e => {
                                 field.onChange(e.target.value);
-                                // form.trigger('advanceAmount'); // Not needed if no cross-validation
                             }} />
                         </FormControl>
                         <FormMessage />
@@ -305,3 +309,4 @@ export function BookingFormDialog({
     </Dialog>
   );
 }
+
