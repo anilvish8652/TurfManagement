@@ -61,6 +61,10 @@ export function BookingDetailsDialog({
       );
     }
 
+    const totalAmount = parseFloat(bookingDetails.amount);
+    const balanceAmount = parseFloat(bookingDetails.balanceAmount);
+    const advanceAmount = totalAmount - balanceAmount;
+
     return (
       <div className="space-y-6 text-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -77,8 +81,9 @@ export function BookingDetailsDialog({
             <p><strong>Address:</strong> {bookingDetails.turfAddress}</p>
             <p><strong>Day:</strong> {bookingDetails.dayBooked}</p>
             <p><strong>Slots:</strong> {bookingDetails.bookingSlots}</p>
-            <p><strong>Total Amount:</strong> ₹{parseFloat(bookingDetails.amount).toFixed(2)}</p>
-            <p><strong>Balance:</strong> ₹{parseFloat(bookingDetails.balanceAmount).toFixed(2)}</p>
+            <p><strong>Total Amount:</strong> ₹{totalAmount.toFixed(2)}</p>
+            <p><strong>Advance Amount:</strong> ₹{advanceAmount.toFixed(2)}</p>
+            <p><strong>Balance:</strong> ₹{balanceAmount.toFixed(2)}</p>
           </div>
         </div>
 
@@ -159,4 +164,6 @@ style.innerHTML = `
     background: hsl(var(--primary) / 0.7); 
   }
 `;
-document.head.appendChild(style);
+if (typeof window !== 'undefined') {
+  document.head.appendChild(style);
+}
